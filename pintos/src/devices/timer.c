@@ -89,11 +89,27 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
+
+//adding new code below
+	struct thread *t =thread_current();
+
+	//calculate when to wake thread
+ 	//need to create sys_tick function 	
+	t->awakeTime = sys_tick() + ticks;
+	//t->awakeTime = timer_ticks() + ticks;	
+
+
+
+//end of new code
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+//disable interrupts after ASSERT, don't forget to renable
+  while (timer_elapsed (start) < ticks)//change into while(1) and continue, break if ready 
+	
+	//thread yield is a form of busy waiting which shouldn't be used (ss)    
+	//use block and unblock perhaps?
+	//thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +188,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  //look through sleeping list 
+  if (thread&t->awakeTime <=ticks){
+  	//unblock thread
+  	//remove from sleeping list
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
