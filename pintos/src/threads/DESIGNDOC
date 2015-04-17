@@ -15,10 +15,12 @@ Selik Samai <santo003@ucr.edu> <861033991>
 
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please give them here.
+	- Extra credit advanced scheduler not attempted.
 
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+	-N/A
 
 			     ALARM CLOCK
 			     ===========
@@ -29,13 +31,33 @@ Selik Samai <santo003@ucr.edu> <861033991>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+static struct list sleeping_threads;
+This was added in timer.c and keeps track of the sleeping threads
+
+int64_t ticks;
+This was added to thread.h in struct thread.
+If the thread is currently sleeping the tick will indicate when the thread is needed and ready to be unblocked.
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+void timer_sleep (int64_t ticks)
+We use the global variable to calculate the tick value for the thread.
+The thread is then added to the sleep list. 
+We implemented it in such a way that the thread is added to the sleep list in a sorted order. 
+The thread is blocked.
+
+static void timer_interrupt (struct intr_frame *args UNUSED)
+We used a for loop to iterate the begging to end of the sleeping_threads list.
+We compare the threads tick value and if it is less thean 0 we unblock and remove it from the list. 
+We then increment the tick value cand call thread_tick().	
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+Because we made our sleepint_threads list in sorted order we do not spend any more timme in the timer interrupt handler than is necessary.
 
 ---- SYNCHRONIZATION ----
 
