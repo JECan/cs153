@@ -80,33 +80,97 @@ Because we made our sleepint_threads list in sorted order we do not spend any mo
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
-
+	struct list slp_list:
+	enum interrupt prev_level:this is for turning interrupts off
+		so that we can add a thread to our sleep list 
+	
+	struct lock *wait:this is the lock that a waiting thread is 
+		waiting on
+	
+	struct list lock_donations: This is a list of threads requiring
+		donation. 
+	struct add_donation:this can be added to another threads donation
+		
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+	for priority donation, we use a priority queue. The thread with the
+	highest priority is run, while lower priority threads wait. This ensures
+	that we are executing tasks that are most important.
+
+	Priority 1		Priority 2		Priority 3
+	_________		_________		_________
+	|  A	|---------->>	|  B	|--------->>	|  C	|
+	|_______|		|_______|		|_______|
+	
+	Here we have 3 threads, ecah with different priority. The thread
+	with the highest priority is Priority 3, lowest is Priority 1. We 
+	still need to use locks to make sure other threads aren't taking up
+	resources. So if P3 needs a resource it acquires a lock (no other 
+	thread has access to a locked resource). So if threads A and C use the 
+	same resource but thread A has the lock, thread C can't run. Donation		will allow thread A to then have the same priority of thread C. So now
+	thread A can run before thread B and upon completion, will release the
+	lock for thread C, then thread B will run. So, to implement this, we 
+	need to notate which thread has the lock in addition to our priority 
+	queue 
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
+	based off of our priority. We assigned specific values (0-63) 
+	and each thread is assigned a priority and placed in a priority
+	queue.When we are running, we are sure that the first entry in the 
+	queue is woken first. We simply have a list that inserts in the 
+	manner conducive to produce an O(1) pop for waking up the thread
+	if the highest priority thread is not able to acquire the lock 
+	because another thread has it, then we would use priority donation
+	on the thread with the lock(thread with locks priority == waiting 
+	thread 	priority). This will allow for the lock to be released, 
+	we of course would need to allow for the thread that received the 
+	donation to run and release the lock so that our waiting thread can run
+	and execute.
 
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
-
+	lock_acquire() first disables interrupts 
+	if(lock is not held){
+		this thread needs to receive current waiting threads priority
+	}
+	if(lock held w/ low priority){
+		current thread adds self to donation list 
+	}
+	if(lock held w/high priority){
+		
+	}	
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
-
+	*lock holder == NULL
+	*donation is obsolete once lock is released 
+	*find highest priority thread after refreshing current threads priority
+	* a new thread acquires lock 
+	* thread with lock goes in ready queue
+	* check if need to yield
 ---- SYNCHRONIZATION ----
 
 >> B6: Describe a potential race in thread_set_priority() and explain
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
-
+	When interrupts are turned off, we can encounter a potential race 		condition in where a thread priority is being updated and threads 
+	are trying to set the same priority to multiple threads.
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
-
+	Our design is based heavily on the linked list style and having to 
+	implement the priority queue, this allowed for all popping operations
+	to be O(1). Since we knew we would have to disable interrupts when 
+	organizing our list, we wanted to make sure we minimized issues with it.
+	Based off the priority of the inserted thread determines it's location 		in the list.So if the thread has a high priority, it'll be inserted 
+	in front of list. We want to minimize the length of time interrupts
+	are off. There are implementations where one could just insert into 
+	the list unsorted and only pop the list by iterating through but
+	this seems wasteful. 
 			  ADVANCED SCHEDULER
 			    (If Attempted)
 			  ==================
