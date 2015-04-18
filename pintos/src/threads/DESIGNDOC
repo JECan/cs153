@@ -20,7 +20,7 @@ Selik Samai <santo003@ucr.edu> <861033991>
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
-	-N/A
+	- N/A
 
 			     ALARM CLOCK
 			     ===========
@@ -31,12 +31,13 @@ Selik Samai <santo003@ucr.edu> <861033991>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-static struct list sleeping_threads;
+static struct list sleeping_list;
 This was added in timer.c and keeps track of the sleeping threads
 
 int64_t ticks;
 This was added to thread.h in struct thread.
-If the thread is currently sleeping the tick will indicate when the thread is needed and ready to be unblocked.
+If the thread is currently sleeping the tick will indicate when the thread
+ is needed and ready to be unblocked.
 
 ---- ALGORITHMS ----
 
@@ -44,33 +45,48 @@ If the thread is currently sleeping the tick will indicate when the thread is ne
 >> including the effects of the timer interrupt handler.
 
 void timer_sleep (int64_t ticks)
-We use the global variable to calculate the tick value for the thread.
-The thread is then added to the sleep list. 
-We implemented it in such a way that the thread is added to the sleep list in a sorted order. 
-The thread is blocked.
+timer_sleep is called along with the wake up time for the particular
+thread. Interrupts are then disabled and a call is made for the thread's
+wake up time. The thread is inserted to the sleeping list and is then
+blocked.
 
 static void timer_interrupt (struct intr_frame *args UNUSED)
-We used a for loop to iterate the begging to end of the sleeping_threads list.
-We compare the threads tick value and if it is less thean 0 we unblock and remove it from the list. 
-We then increment the tick value cand call thread_tick().	
+We iterate through our sorted sleeping list. The threads to be woken
+up are then removed from the sleeping list and unblocked. 
 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
 
-Because we made our sleepint_threads list in sorted order we do not spend any more timme in the timer interrupt handler than is necessary.
+Because we made our sleeping_threads list in sorted order we do not spend
+any more time in the timer interrupt handler than is necessary.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
+timer_sleep disables interrupts when the sleeping list is being 
+manipulated. We also have a check to ensure the tick value is valid. 
+If the tick value is invalid, the thread should not sleep.
+
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
 
+timer_sleep disables interrupts when the sleeping list is being changed. 
+If there was no disabling of interrupts then the tick value would change and
+be greater than originally intended. Because of this, the thread could 
+possibly never sleep. 
+ 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+We originally intended to implement an unsorted sleeping list. However
+if the sleeping list was unsorted we would spend more time in the 
+interrupt handler than necessary. Because of this, we chose to make our
+sleeping list sorted. Now the handler does not have to iterate through the
+list at every single interrupt. 
 
 			 PRIORITY SCHEDULING
 			 ===================
