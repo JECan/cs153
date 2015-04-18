@@ -155,9 +155,10 @@ list at every single interrupt.
 	}
 	if(lock held w/ low priority){
 		current thread adds self to donation list 
+		waiting thread priority goes to thread with lock
 	}
 	if(lock held w/high priority){
-		
+		acquire lock and run
 	}	
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
