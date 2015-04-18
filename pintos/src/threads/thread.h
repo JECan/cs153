@@ -90,10 +90,13 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 	
-    //add awakeTime to thread struct below by(ss)
-    int awakeTime;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    /*FOR PART 1 - ALARM CLOCK - for timer sleep*/
+    struct list_elem sleep_thread;
+    int64_t ticks;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

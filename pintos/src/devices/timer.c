@@ -17,6 +17,9 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+/*FOR PART 1 - alarm */
+static struct list sleeping_list;
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
@@ -37,6 +40,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleeping_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,27 +93,20 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-
-//adding new code below
-	struct thread *t =thread_current();
-
-	//calculate when to wake thread
- 	//need to create sys_tick function 	
-	t->awakeTime = sys_tick() + ticks;
-	//t->awakeTime = timer_ticks() + ticks;	
-
-
-
-//end of new code
-  int64_t start = timer_ticks ();
-
+  int64_t start = timer_ticks();
   ASSERT (intr_get_level () == INTR_ON);
-//disable interrupts after ASSERT, don't forget to renable
-  while (timer_elapsed (start) < ticks)//change into while(1) and continue, break if ready 
-	
-	//thread yield is a form of busy waiting which shouldn't be used (ss)    
-	//use block and unblock perhaps?
-	//thread_yield ();
+
+  thread_current()->ticks = ticks - timer_elapsed(start);
+  if(thread_current()->ticks <= 0)
+  {
+	thread_yield();
+	return;
+  }
+  //temporarily disable interrupts
+  enum intr_level old_level = intr_disable();
+  list_push_back(&sleeping_list, &thread_current()->sleep_thread);
+  thread_block();
+  intr_set_level(old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -188,11 +185,19 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  //look through sleeping list 
-  if (thread&t->awakeTime <=ticks){
-  	//unblock thread
-  	//remove from sleeping list
-  }
+  struct list_elem *iterator;
+  for(iterator = list_begin(&sleeping_list);
+	  iterator != list_end(&sleeping_list);
+	  iterator = list_next(iterator))
+	{
+		 struct thread *current_element = list_entry(iterator, struct thread, sleep_thread);
+		 current_element->ticks--;
+		 if(current_element->ticks <= 0)
+	 	 {
+			thread_unblock(current_element);
+			list_remove(&current_element->sleep_thread);
+		 }
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
