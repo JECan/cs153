@@ -20,8 +20,12 @@ Selik Samai <santo003@ucr.edu> <861033991>
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
-	- N/A
 
+	http://w3.cs.jmu.edu/kirkpams/450-f11/slides/pintos.pdf
+	http://www.cse.iitd.ernet.in/~sbansal/os/pintos/doc/pintos_html/lib_2kernel_2list_8c.html
+	-both helped with lists, specifically list_insert_ordered() 
+
+	http://www.scs.stanford.edu/09wi-cs140/pintos/pintos.pdf
 			     ALARM CLOCK
 			     ===========
 

@@ -85,6 +85,37 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+/* ADDED FUNCTIONS FOR PINTOS PROJECT PART 1*/
+
+static bool compare_priority(const struct list_elem *a,
+							 const sturct list_elem *b
+							 void *aux UNUSED)
+{
+	struct thread *first_thread = list_entry(a, struct thread, elem);
+	struct thread *second_thread = list_entry(b, struct thread, elem);
+	if((first_thread->priority) > (second_thread->priority))
+		return true;
+	else
+		return false;
+}
+
+static bool compare_ticks(const struct list_elem *a,
+							 const sturct list_elem *b
+							 void *aux UNUSED)
+{
+	struct thread *first_thread = list_entry(a, struct thread, elem);
+	struct thread *second_thread = list_entry(b, struct thread, elem);
+	if((first_thread->ticks) < (second_thread->ticks))
+		return true;
+	else
+		return false;
+
+}
+
+
+/* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
+
 void
 thread_init (void) 
 {
@@ -246,7 +277,10 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+//list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem,
+					  list_less_func * &compare_priority,
+					  NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -316,8 +350,12 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread)
+  {
+//	  list_push_back (&ready_list, &cur->elem);
+	  list_insert_ordered(&ready_list, &cur->elem,
+						  list_less_func * &compare_priority, NULL);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -344,14 +382,24 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+//  thread_current ()->priority = new_priority;
+	enum intr_level old_level = intr_disable();
+	int prev_priority = thread_current()->priority;
+	thread_current()->initial_priority = new_priority;
+
+
+	intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+//  return thread_current ()->priority;
+	enum intr_level old_level = intr_disable();
+	int thread_priority = thread_current()->priority;
+	intr_set_level(old_level);
+	return thread_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */

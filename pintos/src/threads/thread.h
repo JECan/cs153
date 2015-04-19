@@ -98,6 +98,13 @@ struct thread
     struct list_elem sleep_thread;
     int64_t ticks;
 
+	/*FOR PART 2 - PRIORITY SCHEDULING*/
+	int initial_priority;
+//	struct lock *lock_wait;
+//	struct list donate;
+//	struct list_elem donation_thread;
+
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -143,4 +150,15 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/*FOR PART 2*/
+/*BEGINNING OF NEW FUNCTIONS FOR PINTOS PROJECT PART 1 */
+static bool compare_priority(const struct list_elem *a, 
+							 const struct list_elem *b
+							 void *aux UNUSED);
+
+static bool compare_ticks(const struct list_elem *a, 
+						  const struct list_elem *b
+						  void *aux UNUSED);
+
+/*END OF NEW FUNCTIONS FOR PINTOS PROJECT PART 1 */
 #endif /* threads/thread.h */
