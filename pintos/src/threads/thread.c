@@ -119,20 +119,33 @@ void maximum_priority(void)
 	struct thread *tempthread = list_entry(list_front(&ready_list),
 										   struct thread,
 										   elem);
-	if(tempthread->priority > thread_get_priority())
+//	if(tempthread->priority > thread_get_priority())
+//	{
+//		if(!intr_context())
+//			thread_yield();
+//		else
+//			intr_yield_on_return();
+//	}
+	if(intr_context())
 	{
-		if(!intr_context())
-			thread_yield();
-		else
+		thread_ticks++;
+		if(thread_current()->priority < tempthread->priority
+			|| (thread_ticks >= TIME_SLICE &&
+			thread_current()->priority == tempthread->priority))
+		{
 			intr_yield_on_return();
+		}
+		return;
 	}
+	if(thread_current()->priority < tempthread->priority)
+		thread_yield();
 }
 
 void priority_donation(void)
 {
 	//setting maximum priority donation depth to 10 threads
 	int ground = 0;
-	int max = 10;
+	int max = 8;
 	struct thread *current_thread = thread_current();
 	struct lock * current_lock = current_thread->lock_wait;
 	while((current_lock < max) && (ground < max))
@@ -304,7 +317,9 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  old_level = intr_disable();
+  maximum_priority();
+  intr_set_level(old_level);
   return tid;
 }
 

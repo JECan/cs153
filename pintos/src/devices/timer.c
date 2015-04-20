@@ -191,8 +191,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
 	 list_remove(iterator);
 	 thread_unblock(current_element);
 	 iterator = list_begin(&sleeping_list);
-	}
-	maximum_priority();
+  }
+  maximum_priority();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
