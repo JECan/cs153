@@ -88,8 +88,8 @@ static tid_t allocate_tid (void);
 
 /* ADDED FUNCTIONS FOR PINTOS PROJECT PART 1*/
 
-static bool compare_priority(const struct list_elem *a,
-							 const sturct list_elem *b
+bool compare_priority(const struct list_elem *a,
+							 const struct list_elem *b,
 							 void *aux UNUSED)
 {
 	struct thread *first_thread = list_entry(a, struct thread, elem);
@@ -100,8 +100,8 @@ static bool compare_priority(const struct list_elem *a,
 		return false;
 }
 
-static bool compare_ticks(const struct list_elem *a,
-							 const sturct list_elem *b
+bool compare_ticks(const struct list_elem *a,
+							 const struct list_elem *b,
 							 void *aux UNUSED)
 {
 	struct thread *first_thread = list_entry(a, struct thread, elem);
@@ -110,9 +110,73 @@ static bool compare_ticks(const struct list_elem *a,
 		return true;
 	else
 		return false;
-
 }
 
+void maximum_priority(void)
+{
+	if(list_empty(&ready_list))
+		return;
+	struct thread *tempthread = list_entry(list_front(&ready_list),
+										   struct thread,
+										   elem);
+	if(tempthread->priority > thread_get_priority())
+	{
+		if(!intr_context())
+			thread_yield();
+		else
+			intr_yield_on_return();
+	}
+}
+
+void priority_donation(void)
+{
+	//setting maximum priority donation depth to 10 threads
+	int ground = 0;
+	int max = 10;
+	struct thread *current_thread = thread_current();
+	struct lock * current_lock = current_thread->lock_wait;
+	while((current_lock < max) && (ground < max))
+	{
+		ground++;
+		//if lock not held, return
+		if(!current_lock->holder)
+			return;
+		//if locked threads priority is >= current thread priority, return
+		if(current_lock->holder->priority >= current_thread->priority)
+			return;
+		//set lock holder priority to be that of the higher thread
+		current_lock->holder->priority = current_thread->priority;
+		current_thread = current_lock->holder;
+		current_lock = current_thread->lock_wait;
+	}
+}
+void lock_removal(struct lock *lock)
+{
+	struct list_elem *current_element = list_begin(&thread_current()->donate);
+	struct list_elem *next_element;
+	while(current_element != list_end(&thread_current()->donate))
+	{
+		struct thread *temp_thread = list_entry(current_element,
+												struct thread,
+												donation_thread);
+		next_element = list_next(current_element);
+		if(temp_thread->lock_wait == lock)
+			list_remove(current_element);
+		current_element = next_element;
+	}
+}
+void update_priority(void)
+{
+	struct thread *current_thread = thread_current();
+	current_thread->priority = current_thread->initial_priority;
+	if(list_empty(&current_thread->donate))
+		return;
+	struct thread *update_thread = list_entry(list_front(&current_thread->donate),
+											  struct thread, 
+											  donation_thread);
+	if(update_thread->priority > current_thread->priority)
+		current_thread->priority = update_thread->priority;
+}
 
 /* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
 
@@ -279,7 +343,7 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
 //list_push_back (&ready_list, &t->elem);
   list_insert_ordered(&ready_list, &t->elem,
-					  list_less_func * &compare_priority,
+					  (list_less_func *) &compare_priority,
 					  NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -354,7 +418,7 @@ thread_yield (void)
   {
 //	  list_push_back (&ready_list, &cur->elem);
 	  list_insert_ordered(&ready_list, &cur->elem,
-						  list_less_func * &compare_priority, NULL);
+						  (list_less_func *) &compare_priority, NULL);
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -386,8 +450,13 @@ thread_set_priority (int new_priority)
 	enum intr_level old_level = intr_disable();
 	int prev_priority = thread_current()->priority;
 	thread_current()->initial_priority = new_priority;
-
-
+	update_priority();
+	//donate priority if new priority is greater
+	if(prev_priority < thread_current()->priority)
+		priority_donation();
+	//if priority less, check for a yield
+	if(prev_priority > thread_current()->priority)
+		maximum_priority();
 	intr_set_level(old_level);
 }
 

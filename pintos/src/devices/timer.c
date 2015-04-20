@@ -93,25 +93,14 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-//  int64_t start = timer_ticks();
   ASSERT (intr_get_level () == INTR_ON);
-
-//  thread_current()->ticks = ticks - timer_elapsed(start);
-//  if(thread_current()->ticks <= 0)
-//  {
-//	thread_yield();
-//	return;
-//  }
   if(ticks <= 0)
-  {
 	return;
-  }
   //temporarily disable interrupts
   enum intr_level old_level = intr_disable();
-//  list_push_back(&sleeping_list, &thread_current()->sleep_thread);
   thread_current()->ticks = timer_ticks() + ticks;
-  list_insert_ordered(&sleeping_list,thread_current()->elem,
-					  list_less_func * &compare_ticks,
+  list_insert_ordered(&sleeping_list,&thread_current()->elem,
+					  (list_less_func *) &compare_ticks,
 					  NULL);
   thread_block();
   intr_set_level(old_level);
@@ -192,32 +181,18 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
-  struct list_elem *iterator;
-//  for(iterator = list_begin(&sleeping_list);
-//	  iterator != list_end(&sleeping_list);
-//	  iterator = list_next(iterator))
-	struct list_elem *iterator = list_begin(&sleeping_list);
-	while(iterator != list_end(&sleeping_list))
-	{
-//		 struct thread *current_element = list_entry(iterator, struct thread, sleep_thread);
-//		 current_element->ticks--;
-//		 if(current_element->ticks <= 0)
-//	 	 {
-//			thread_unblock(current_element);
-//			list_remove(&current_element->sleep_thread);
-//		 }
-		 struct thread *current_element = list_entry(iterator, struct thread, elem);
-		 //if ticks less than current element break
-		 //otherwse remove the thread from sleeping
-		 //list and unblock the thread
-		 if(ticks < current_element->ticks)
-		 	 break;
-		 list_remove(current_element);
-		 thread_unblock(current_element);
-		 iterator = list_begin(&sleeping_list);
+  thread_tick();
+  struct list_elem *iterator = list_begin(&sleeping_list);
+  while(iterator != list_end(&sleeping_list))
+  {
+  	  struct thread *current_element = list_entry(iterator, struct thread, elem);
+	 if(ticks < current_element->ticks)
+		 break;
+	 list_remove(iterator);
+	 thread_unblock(current_element);
+	 iterator = list_begin(&sleeping_list);
 	}
-	//need to test if thread has max priority
+	maximum_priority();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

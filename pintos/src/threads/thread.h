@@ -100,9 +100,9 @@ struct thread
 
 	/*FOR PART 2 - PRIORITY SCHEDULING*/
 	int initial_priority;
-//	struct lock *lock_wait;
-//	struct list donate;
-//	struct list_elem donation_thread;
+	struct lock *lock_wait;
+	struct list donate;
+	struct list_elem donation_thread;
 
 
 #ifdef USERPROG
@@ -152,13 +152,18 @@ int thread_get_load_avg (void);
 
 /*FOR PART 2*/
 /*BEGINNING OF NEW FUNCTIONS FOR PINTOS PROJECT PART 1 */
-static bool compare_priority(const struct list_elem *a, 
-							 const struct list_elem *b
+bool compare_priority(const struct list_elem *a, 
+							 const struct list_elem *b,
 							 void *aux UNUSED);
 
-static bool compare_ticks(const struct list_elem *a, 
-						  const struct list_elem *b
+bool compare_ticks(const struct list_elem *a, 
+						  const struct list_elem *b,
 						  void *aux UNUSED);
+
+void maximum_priority(void);
+void priority_donation(void);
+void lock_removal(struct lock *lock);
+void update_priority(void);
 
 /*END OF NEW FUNCTIONS FOR PINTOS PROJECT PART 1 */
 #endif /* threads/thread.h */
