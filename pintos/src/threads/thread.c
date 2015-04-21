@@ -16,6 +16,7 @@
 #include "userprog/process.h"
 #endif
 
+#define D_LIMIT 8
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -86,112 +87,6 @@ static tid_t allocate_tid (void);
    It is not safe to call thread_current() until this function
    finishes. */
 
-/* ADDED FUNCTIONS FOR PINTOS PROJECT PART 1*/
-
-bool compare_priority(const struct list_elem *a,
-							 const struct list_elem *b,
-							 void *aux UNUSED)
-{
-	struct thread *first_thread = list_entry(a, struct thread, elem);
-	struct thread *second_thread = list_entry(b, struct thread, elem);
-	if((first_thread->priority) > (second_thread->priority))
-		return true;
-	else
-		return false;
-}
-
-bool compare_ticks(const struct list_elem *a,
-							 const struct list_elem *b,
-							 void *aux UNUSED)
-{
-	struct thread *first_thread = list_entry(a, struct thread, elem);
-	struct thread *second_thread = list_entry(b, struct thread, elem);
-	if((first_thread->ticks) < (second_thread->ticks))
-		return true;
-	else
-		return false;
-}
-
-void maximum_priority(void)
-{
-	if(list_empty(&ready_list))
-		return;
-	struct thread *tempthread = list_entry(list_front(&ready_list),
-										   struct thread,
-										   elem);
-//	if(tempthread->priority > thread_get_priority())
-//	{
-//		if(!intr_context())
-//			thread_yield();
-//		else
-//			intr_yield_on_return();
-//	}
-	if(intr_context())
-	{
-		thread_ticks++;
-		if(thread_current()->priority < tempthread->priority
-			|| (thread_ticks >= TIME_SLICE &&
-			thread_current()->priority == tempthread->priority))
-		{
-			intr_yield_on_return();
-		}
-		return;
-	}
-	if(thread_current()->priority < tempthread->priority)
-		thread_yield();
-}
-
-void priority_donation(void)
-{
-	//setting maximum priority donation depth to 10 threads
-	int ground = 0;
-	int max = 8;
-	struct thread *current_thread = thread_current();
-	struct lock * current_lock = current_thread->lock_wait;
-	while((current_lock < max) && (ground < max))
-	{
-		ground++;
-		//if lock not held, return
-		if(!current_lock->holder)
-			return;
-		//if locked threads priority is >= current thread priority, return
-		if(current_lock->holder->priority >= current_thread->priority)
-			return;
-		//set lock holder priority to be that of the higher thread
-		current_lock->holder->priority = current_thread->priority;
-		current_thread = current_lock->holder;
-		current_lock = current_thread->lock_wait;
-	}
-}
-void lock_removal(struct lock *lock)
-{
-	struct list_elem *current_element = list_begin(&thread_current()->donate);
-	struct list_elem *next_element;
-	while(current_element != list_end(&thread_current()->donate))
-	{
-		struct thread *temp_thread = list_entry(current_element,
-												struct thread,
-												donation_thread);
-		next_element = list_next(current_element);
-		if(temp_thread->lock_wait == lock)
-			list_remove(current_element);
-		current_element = next_element;
-	}
-}
-void update_priority(void)
-{
-	struct thread *current_thread = thread_current();
-	current_thread->priority = current_thread->initial_priority;
-	if(list_empty(&current_thread->donate))
-		return;
-	struct thread *update_thread = list_entry(list_front(&current_thread->donate),
-											  struct thread, 
-											  donation_thread);
-	if(update_thread->priority > current_thread->priority)
-		current_thread->priority = update_thread->priority;
-}
-
-/* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
 
 void
 thread_init (void) 
@@ -357,9 +252,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 //list_push_back (&ready_list, &t->elem);
-  list_insert_ordered(&ready_list, &t->elem,
-					  (list_less_func *) &compare_priority,
-					  NULL);
+  list_insert_ordered(&ready_list, &t->elem,													 (list_less_func *) &compare_priority,										 NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -432,8 +325,7 @@ thread_yield (void)
   if (cur != idle_thread)
   {
 //	  list_push_back (&ready_list, &cur->elem);
-	  list_insert_ordered(&ready_list, &cur->elem,
-						  (list_less_func *) &compare_priority, NULL);
+	  list_insert_ordered(&ready_list, &cur->elem,													 (list_less_func *) &compare_priority, NULL);
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -461,7 +353,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-//  thread_current ()->priority = new_priority;
+	if(thread_mlfqs)
+	{
+		return;
+	}
+//	thread_current ()->priority = new_priority;
 	enum intr_level old_level = intr_disable();
 	int prev_priority = thread_current()->priority;
 	thread_current()->initial_priority = new_priority;
@@ -479,11 +375,12 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-//  return thread_current ()->priority;
-	enum intr_level old_level = intr_disable();
+  return thread_current ()->priority;
+/*	enum intr_level old_level = intr_disable();
 	int thread_priority = thread_current()->priority;
 	intr_set_level(old_level);
 	return thread_priority;
+*/
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -603,6 +500,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  //initialize for priority donation
+  t->initial_priority = priority;
+  t->lock_wait = NULL;
+  list_init(&t->donate);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -718,3 +620,106 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* ADDED FUNCTIONS FOR PINTOS PROJECT PART 1*/
+
+bool compare_priority(const struct list_elem *a,													 const struct list_elem *b,													 void *aux UNUSED)
+{
+	struct thread *first_thread = list_entry(a, struct thread, elem);
+	struct thread *second_thread = list_entry(b, struct thread, elem);
+	if((first_thread->priority) > (second_thread->priority))
+		return true;
+	else
+		return false;
+}
+
+bool compare_ticks(const struct list_elem *a,												  const struct list_elem *b,												  void *aux UNUSED)
+{
+	struct thread *first_thread = list_entry(a, struct thread, elem);
+	struct thread *second_thread = list_entry(b, struct thread, elem);
+	if((first_thread->ticks) < (second_thread->ticks))
+		return true;
+	else
+		return false;
+}
+
+void maximum_priority(void)
+{
+	if(list_empty(&ready_list))
+		return;
+	struct thread *tempthread = list_entry(list_front(&ready_list),
+										   struct thread,
+										   elem);
+//	if(tempthread->priority > thread_get_priority())
+//	{
+//		if(!intr_context())
+//			thread_yield();
+//		else
+//			intr_yield_on_return();
+//	}
+	if(intr_context())
+	{
+		thread_ticks++;
+		if(thread_current()->priority < tempthread->priority
+			|| (thread_ticks >= TIME_SLICE &&
+			thread_current()->priority == tempthread->priority))
+		{
+			intr_yield_on_return();
+		}
+		return;
+	}
+	if(thread_current()->priority < tempthread->priority)
+		thread_yield();
+}
+
+void priority_donation(void)
+{
+	//setting maximum priority donation depth to 10 threads
+	int ground = 0;
+	struct thread *current_thread = thread_current();
+	struct lock *current_lock = current_thread->lock_wait;
+	while(current_lock && ground < D_LIMIT)
+	{
+		ground++;
+		//if lock not held, return
+		if(!current_lock->holder)
+			return;
+		//if locked threads priority is >= current thread priority, return
+		if(current_lock->holder->priority >= current_thread->priority)
+			return;
+		//set lock holder priority to be that of the higher thread
+		current_lock->holder->priority = current_thread->priority;
+		current_thread = current_lock->holder;
+		current_lock = current_thread->lock_wait;
+	}
+}
+void lock_removal(struct lock *lock)
+{
+	struct list_elem *current_element = list_begin(&thread_current()->donate);
+	struct list_elem *next_element;
+	while(current_element != list_end(&thread_current()->donate))
+	{
+		struct thread *temp_thread = list_entry(current_element,
+												struct thread,
+												donation_thread);
+		next_element = list_next(current_element);
+		if(temp_thread->lock_wait == lock)
+			list_remove(current_element);
+		current_element = next_element;
+	}
+}
+void update_priority(void)
+{
+	struct thread *current_thread = thread_current();
+	current_thread->priority = current_thread->initial_priority;
+	if(list_empty(&current_thread->donate))
+		return;
+	struct thread *update_thread = list_entry(list_front(&current_thread->donate),
+											  struct thread, 
+											  donation_thread);
+	if(update_thread->priority > current_thread->priority)
+		current_thread->priority = update_thread->priority;
+}
+
+/* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
+
