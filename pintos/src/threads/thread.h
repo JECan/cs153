@@ -82,6 +82,18 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 struct thread
   {
+	/* BEGINNING OF MODIFIED STRUCT FOR PINTOS PROJECT 1*/
+    /*FOR PART 1 - ALARM CLOCK - for timer sleep*/
+    struct list_elem sleep_thread;
+    int64_t ticks;
+
+	/*FOR PART 2 - PRIORITY SCHEDULING*/
+	int initial_priority;
+	struct lock *lock_wait;
+	struct list donate;
+	struct list_elem donation_thread;
+	/* END OF MODIFIED STRUCT FOR PINTOS PROJECT 1*/
+
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
@@ -93,17 +105,6 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-
-    /*FOR PART 1 - ALARM CLOCK - for timer sleep*/
-    struct list_elem sleep_thread;
-    int64_t ticks;
-
-	/*FOR PART 2 - PRIORITY SCHEDULING*/
-	int initial_priority;
-	struct lock *lock_wait;
-	struct list donate;
-	struct list_elem donation_thread;
-
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -150,16 +151,13 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/*FOR PART 2*/
 /*BEGINNING OF NEW FUNCTIONS FOR PINTOS PROJECT PART 1 */
-bool compare_priority(const struct list_elem *a, 
-							 const struct list_elem *b,
-							 void *aux UNUSED);
-
-bool compare_ticks(const struct list_elem *a, 
-						  const struct list_elem *b,
-						  void *aux UNUSED);
-
+bool compare_priority(const struct list_elem *a,
+					  const struct list_elem *b,
+					  void *aux UNUSED);
+bool compare_ticks(const struct list_elem *a,
+				   const struct list_elem *b,
+				   void *aux UNUSED);
 void maximum_priority(void);
 void priority_donation(void);
 void lock_removal(struct lock *lock);
