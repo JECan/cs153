@@ -16,7 +16,6 @@
 #include "userprog/process.h"
 #endif
 
-#define D_LIMIT 8
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -357,17 +356,24 @@ thread_set_priority (int new_priority)
 	{
 		return;
 	}
-//	thread_current ()->priority = new_priority;
+	//disable interrupts
 	enum intr_level old_level = intr_disable();
 	int prev_priority = thread_current()->priority;
 	thread_current()->initial_priority = new_priority;
+	//call to our function implemented below which updates priority of thread
 	update_priority();
 	//donate priority if new priority is greater
 	if(prev_priority < thread_current()->priority)
+	{
 		priority_donation();
+	}
 	//if priority less, check for a yield
 	if(prev_priority > thread_current()->priority)
+	{
+		//call to a our function implemented below
 		maximum_priority();
+	}
+	//restore state
 	intr_set_level(old_level);
 }
 
@@ -645,49 +651,62 @@ bool compare_ticks(const struct list_elem *a,												  const struct list_ele
 
 void maximum_priority(void)
 {
+	//return if ready list is empty
 	if(list_empty(&ready_list))
+	{
 		return;
-	struct thread *tempthread = list_entry(list_front(&ready_list),
-										   struct thread,
-										   elem);
-//	if(tempthread->priority > thread_get_priority())
-//	{
-//		if(!intr_context())
-//			thread_yield();
-//		else
-//			intr_yield_on_return();
-//	}
+	}
+	//take the front of the ready list
+	struct thread *tempthread = list_entry(list_front(&ready_list),															struct thread, elem);
+	/*if an interrupt occurs and current thread priority is 
+	 * less than or equal to the front of the ready list
+	 * then yield on return*/
 	if(intr_context())
 	{
 		thread_ticks++;
 		if(thread_current()->priority < tempthread->priority
-			|| (thread_ticks >= TIME_SLICE &&
-			thread_current()->priority == tempthread->priority))
+			||
+			(thread_ticks >= TIME_SLICE &&
+			thread_current()->priority == tempthread->priority)
+			)
 		{
 			intr_yield_on_return();
 		}
 		return;
 	}
+	/*thread must yield if current priority is less than the 
+	 * front of ready list*/
 	if(thread_current()->priority < tempthread->priority)
+	{
 		thread_yield();
+	}
 }
 
 void priority_donation(void)
 {
-	//setting maximum priority donation depth to 10 threads
-	int ground = 0;
+	//we set a limit on depth of nested priority donations at 8 levels
+	//refrenced from pintos documatation
+	int current_depth = 0;
+	int limit = 8;
 	struct thread *current_thread = thread_current();
 	struct lock *current_lock = current_thread->lock_wait;
-	while(current_lock && ground < D_LIMIT)
+	/* while (the depth and current threads wait_lock is less than the limit)
+	 * we check to see if the current thread has a lock, if not return
+	 * and if locked threads priority is >= current thread priority, return
+	 * after these conditions are checked we set the locked threads priority
+	 * to be that of the thread with the higher priority
+	 */
+	while(current_lock && current_depth < limit)
 	{
-		ground++;
-		//if lock not held, return
+		current_depth++;
 		if(!current_lock->holder)
+		{
 			return;
-		//if locked threads priority is >= current thread priority, return
+		}
 		if(current_lock->holder->priority >= current_thread->priority)
+		{
 			return;
-		//set lock holder priority to be that of the higher thread
+		}
 		current_lock->holder->priority = current_thread->priority;
 		current_thread = current_lock->holder;
 		current_lock = current_thread->lock_wait;
@@ -697,14 +716,17 @@ void lock_removal(struct lock *lock)
 {
 	struct list_elem *current_element = list_begin(&thread_current()->donate);
 	struct list_elem *next_element;
+	/* We iterate through the list of threads to be donated
+	 * we donate to the next element in the list and remove current_element
+	 * from the front of the list*/
 	while(current_element != list_end(&thread_current()->donate))
 	{
-		struct thread *temp_thread = list_entry(current_element,
-												struct thread,
-												donation_thread);
+		struct thread *temp_thread = list_entry(current_element, struct thread,	 											 			   donation_thread);
 		next_element = list_next(current_element);
 		if(temp_thread->lock_wait == lock)
+		{
 			list_remove(current_element);
+		}
 		current_element = next_element;
 	}
 }
@@ -712,13 +734,17 @@ void update_priority(void)
 {
 	struct thread *current_thread = thread_current();
 	current_thread->priority = current_thread->initial_priority;
+	//if current_thread has an empty donation,return
 	if(list_empty(&current_thread->donate))
+	{
 		return;
-	struct thread *update_thread = list_entry(list_front(&current_thread->donate),
-											  struct thread, 
-											  donation_thread);
+	}
+	struct thread *update_thread = list_entry(list_front(&current_thread->donate),														 struct thread, donation_thread);
+	//if the updated thread priority is greater, then update current threads priorty
 	if(update_thread->priority > current_thread->priority)
+	{
 		current_thread->priority = update_thread->priority;
+	}
 }
 
 /* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
