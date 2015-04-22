@@ -40,6 +40,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  //initialize our sleeping list
   list_init(&sleeping_list);
 }
 
@@ -95,12 +96,16 @@ timer_sleep (int64_t ticks)
 {
   ASSERT (intr_get_level () == INTR_ON);
   if(ticks <= 0)
-	return;
+  {
+  	  return;
+  }
   //temporarily disable interrupts
   enum intr_level old_level = intr_disable();
   thread_current()->ticks = timer_ticks() + ticks;
-  list_insert_ordered(&sleeping_list,&thread_current()->elem,									 (list_less_func *) &compare_ticks, NULL);
+  list_insert_ordered(&sleeping_list,&thread_current()->elem,
+					  (list_less_func *) &compare_ticks, NULL);
   thread_block();
+  //restore state
   intr_set_level(old_level);
 }
 
@@ -183,7 +188,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
   struct list_elem *iterator = list_begin(&sleeping_list);
   while(iterator != list_end(&sleeping_list))
   {
-  	  struct thread *current_element = list_entry(iterator, struct thread, elem);
+  	  struct thread *current_element = list_entry(iterator,
+												  struct thread, elem);
 	 if(ticks < current_element->ticks)
 	 {
 		 break;
@@ -192,6 +198,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 	 thread_unblock(current_element);
 	 iterator = list_begin(&sleeping_list);
   }
+  //determine if thread has highest priority
   maximum_priority();
 }
 
