@@ -11,7 +11,6 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-//#include "list.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -250,7 +249,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-//list_push_back (&ready_list, &t->elem);
   list_insert_ordered(&ready_list, &t->elem,
 					 (list_less_func *) &compare_priority,
 					 NULL);
@@ -325,7 +323,6 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread)
   {
-//	  list_push_back (&ready_list, &cur->elem);
 	  list_insert_ordered(&ready_list, &cur->elem,
 						 (list_less_func *) &compare_priority, NULL);
   }
@@ -355,7 +352,7 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-	if(thread_mlfqs)
+	if(thread_mlfqs == true)
 	{
 		return;
 	}
@@ -363,7 +360,7 @@ thread_set_priority (int new_priority)
 	enum intr_level old_level = intr_disable();
 	int prev_priority = thread_current()->priority;
 	thread_current()->initial_priority = new_priority;
-	//call to our function implemented below which updates priority of thread
+	//calls function implemented below which updates priority of thread
 	update_priority();
 	//donate priority if new priority is greater
 	if(prev_priority < thread_current()->priority)
@@ -639,9 +636,13 @@ bool compare_priority(const struct list_elem *a,
 	struct thread *first_thread = list_entry(a, struct thread, elem);
 	struct thread *second_thread = list_entry(b, struct thread, elem);
 	if((first_thread->priority) > (second_thread->priority))
+	{
 		return true;
+	}
 	else
+	{
 		return false;
+	}
 }
 
 bool compare_ticks(const struct list_elem *a,
@@ -651,9 +652,13 @@ bool compare_ticks(const struct list_elem *a,
 	struct thread *first_thread = list_entry(a, struct thread, elem);
 	struct thread *second_thread = list_entry(b, struct thread, elem);
 	if((first_thread->ticks) < (second_thread->ticks))
+	{
 		return true;
+	}
 	else
+	{
 		return false;
+	}
 }
 
 void maximum_priority(void)
@@ -664,17 +669,18 @@ void maximum_priority(void)
 		return;
 	}
 	//take the front of the ready list
-	struct thread *tempthread = list_entry(list_front(&ready_list),															struct thread, elem);
+	struct thread *front_thread = list_entry(list_front(&ready_list),
+										   struct thread, elem);
 	/*if an interrupt occurs and current thread priority is 
 	 * less than or equal to the front of the ready list
 	 * then yield on return*/
 	if(intr_context())
 	{
 		thread_ticks++;
-		if(thread_current()->priority < tempthread->priority
+		if(thread_current()->priority < front_thread->priority
 			||
 			(thread_ticks >= TIME_SLICE &&
-			thread_current()->priority == tempthread->priority)
+			thread_current()->priority == front_thread->priority)
 			)
 		{
 			intr_yield_on_return();
@@ -683,7 +689,7 @@ void maximum_priority(void)
 	}
 	/*thread must yield if current priority is less than the 
 	 * front of ready list*/
-	if(thread_current()->priority < tempthread->priority)
+	if(thread_current()->priority < front_thread->priority)
 	{
 		thread_yield();
 	}
@@ -728,7 +734,8 @@ void lock_removal(struct lock *lock)
 	 * from the front of the list*/
 	while(current_element != list_end(&thread_current()->donate))
 	{
-		struct thread *temp_thread = list_entry(current_element, struct thread,	 											 			   donation_thread);
+		struct thread *temp_thread = list_entry(current_element,
+									 struct thread, donation_thread);
 		next_element = list_next(current_element);
 		if(temp_thread->lock_wait == lock)
 		{
@@ -746,13 +753,11 @@ void update_priority(void)
 	{
 		return;
 	}
-	struct thread *update_thread = list_entry(list_front(&current_thread->donate),														 struct thread, donation_thread);
+	struct thread *update_thread = list_entry(list_front(&current_thread->donate), struct thread, donation_thread);
 	//if the updated thread priority is greater, then update current threads priorty
 	if(update_thread->priority > current_thread->priority)
 	{
 		current_thread->priority = update_thread->priority;
 	}
 }
-
 /* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
-
