@@ -249,9 +249,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem,
-					 (list_less_func *) &compare_priority,
-					 NULL);
+  list_insert_ordered(&ready_list, &t->elem, (list_less_func *) &compare_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -323,8 +321,7 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread)
   {
-	  list_insert_ordered(&ready_list, &cur->elem,
-						 (list_less_func *) &compare_priority, NULL);
+	  list_insert_ordered(&ready_list, &cur->elem, (list_less_func *) &compare_priority, NULL);
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -382,11 +379,6 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
-/*	enum intr_level old_level = intr_disable();
-	int thread_priority = thread_current()->priority;
-	intr_set_level(old_level);
-	return thread_priority;
-*/
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -629,9 +621,7 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* ADDED FUNCTIONS FOR PINTOS PROJECT PART 1*/
 
-bool compare_priority(const struct list_elem *a,
-					  const struct list_elem *b,
-					  void *aux UNUSED)
+bool compare_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
 	struct thread *first_thread = list_entry(a, struct thread, elem);
 	struct thread *second_thread = list_entry(b, struct thread, elem);
@@ -645,9 +635,7 @@ bool compare_priority(const struct list_elem *a,
 	}
 }
 
-bool compare_ticks(const struct list_elem *a,
-				   const struct list_elem *b,
-				   void *aux UNUSED)
+bool compare_ticks(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
 	struct thread *first_thread = list_entry(a, struct thread, elem);
 	struct thread *second_thread = list_entry(b, struct thread, elem);
@@ -669,19 +657,14 @@ void maximum_priority(void)
 		return;
 	}
 	//take the front of the ready list
-	struct thread *front_thread = list_entry(list_front(&ready_list),
-										   struct thread, elem);
+	struct thread *front_thread = list_entry(list_front(&ready_list), struct thread, elem);
 	/*if an interrupt occurs and current thread priority is 
 	 * less than or equal to the front of the ready list
 	 * then yield on return*/
 	if(intr_context())
 	{
 		thread_ticks++;
-		if(thread_current()->priority < front_thread->priority
-			||
-			(thread_ticks >= TIME_SLICE &&
-			thread_current()->priority == front_thread->priority)
-			)
+		if((thread_current()->priority < front_thread->priority) || (thread_current()->priority == front_thread->priority && thread_ticks >= TIME_SLICE))
 		{
 			intr_yield_on_return();
 		}
@@ -734,8 +717,7 @@ void lock_removal(struct lock *lock)
 	 * from the front of the list*/
 	while(current_element != list_end(&thread_current()->donate))
 	{
-		struct thread *temp_thread = list_entry(current_element,
-									 struct thread, donation_thread);
+		struct thread *temp_thread = list_entry(current_element, struct thread, donation_thread);
 		next_element = list_next(current_element);
 		if(temp_thread->lock_wait == lock)
 		{
