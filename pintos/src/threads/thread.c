@@ -692,7 +692,7 @@ void priority_donation(void)
 	 * after these conditions are checked we set the locked threads priority
 	 * to be that of the thread with the higher priority
 	 */
-	while(current_lock && current_depth < limit)
+	while(current_lock  && current_depth < limit)
 	{
 		current_depth++;
 		if(!current_lock->holder)
