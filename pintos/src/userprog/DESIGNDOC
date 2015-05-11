@@ -1,5 +1,5 @@
 		     +--------------------------+
-       	       	     |		CS 153		|
+    	     |		CS 153				|
 		     | PROJECT 2: USER PROGRAMS	|
 		     | 	   DESIGN DOCUMENT     	|
 		     +--------------------------+
@@ -8,8 +8,8 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@ucr.edu>
-FirstName LastName <email@ucr.edu>
+Jonathan Candelaria <jcand003@ucr.edu>
+Selik Samai <santo003@ucr.edu>
 
 ---- PRELIMINARIES ----
 
@@ -20,6 +20,8 @@ FirstName LastName <email@ucr.edu>
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
 
+http://www.scs.stanford.edu/10wi-cs140/labs/10wi-proj2.pdf
+
 			   ARGUMENT PASSING
 			   ================
 
@@ -29,19 +31,59 @@ FirstName LastName <email@ucr.edu>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+no modifications or new data structures, however the following functions
+were modified:
+
+the following functions were modified
+from:
+static bool setup_stack(void **esp);
+to:
+static bool setup_stack(void **esp, const char* filename, char **saveptr);
+
+from:
+load(const char * file_name, void(**eip) (void), void **esp);
+to:
+load(const char * file_name, void(**eip) (void), void **esp, char **saveptr);
+
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
+We parse the user input in order, from left to right and each arguement's
+string is pushed onto the stack. We keep a pointer to each arguement's 
+positin on the stack with char **argv. We use malloc to give the 
+appropriate memory because we do not know the arguement number in compile 
+time. To prevent overflow we double the size if argv is full.
+After saving each arguement strings position in the stack, the size of
+the stack is alligned. The array of pointers is pushed onto the stack in 
+reverse order. We then free argv. Lastly, argv, argc, and the manipulated
+return address are pushed onto the stack.
+
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
+If pintos were to implement strtok() then there would be race conditions.
+The third arguement of strtok_r() - char **saveptr is used to maintain
+context between successive calls that parse the same string.
+An example is if two different threads are calling strtok(). Thread A
+could use the token from thread B, which could possibly crash the OS.
+
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
+
+The first advantage is that is much safer to use shell based parsing.
+This way the shell can check to see any unsafe command before it arrives
+to the kernel. It also reduces complexity of kernel operations.
+The second advantage is the PATH environment variable. Unix shells
+give more flexibility in looking for executable files, in that the shell
+does the searching. Whereas in Pintos, the kernel would be tasked to look
+for the specific file during process initialization.
+
 
 			     SYSTEM CALLS
 			     ============
