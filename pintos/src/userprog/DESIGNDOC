@@ -31,20 +31,12 @@ http://www.scs.stanford.edu/10wi-cs140/labs/10wi-proj2.pdf
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-no modifications or new data structures, however the following functions
-were modified:
+struct exec_helper    
+//takes in a filename and contains a semaphore to handle race conditions,
+a bool for successful loading
 
-the following functions were modified
-from:
-static bool setup_stack(void **esp);
-to:
-static bool setup_stack(void **esp, const char* filename, char **saveptr);
-
-from:
-load(const char * file_name, void(**eip) (void), void **esp);
-to:
-load(const char * file_name, void(**eip) (void), void **esp, char **saveptr);
-
+static bool setup_stack_helper(void **esp)     //used to setup the stack pointer and pushing
+onto the stack correctly
 
 ---- ALGORITHMS ----
 
@@ -52,15 +44,17 @@ load(const char * file_name, void(**eip) (void), void **esp, char **saveptr);
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
-We parse the user input in order, from left to right and each arguement's
-string is pushed onto the stack. We keep a pointer to each arguement's 
-positin on the stack with char **argv. We use malloc to give the 
-appropriate memory because we do not know the arguement number in compile 
-time. To prevent overflow we double the size if argv is full.
-After saving each arguement strings position in the stack, the size of
-the stack is alligned. The array of pointers is pushed onto the stack in 
-reverse order. We then free argv. Lastly, argv, argc, and the manipulated
-return address are pushed onto the stack.
+We use strtok_r() in conjunction with the struct exec_helper(const char* file_name).
+We parse the arguments and remove spaces and with strtok_r. We use
+char* strtok_r(char* str, const char* delim, char** saveptr);
+this particular function has the saveptr which allows us to maintain context
+between successive calls on the same string. Since we are using pointers
+along with the delim, we can be sure that we are taking in args in the
+correct order. As well, we use in the exec_helper to determine if program
+load was successful and if program in loading. The args pushed onto the stack
+obviously should be(LIFO) since it is indeed a stack. We know the size of bytes
+being pushed onto the stack and we know the amount of space we still have
+available. With this, we know whether or not we will overflow.
 
 ---- RATIONALE ----
 
