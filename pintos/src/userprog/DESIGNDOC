@@ -94,6 +94,73 @@ for the specific file during process initialization.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+The following were added in struct thread in thread.h
+
+-int fd
+file descriptor counter for a process, 0 = stdin , 1 = stdout, 
+initialized to 2
+
+-struct list list_of_children
+list of children from a process
+
+-struct list list_of_files
+list of open files from a process
+
+-struct list_of_lock
+list of locks the process holds. Lock is released on exit
+
+The following was added so syscall.c 
+struct process_info
+{
+	bool wait;
+	bool exit;
+	int exit_status;
+	int pid;
+	int load;
+	struct semaphore load_semaphore
+	struct semaphore exit_semaphore
+	struct list_elem elem;
+};
+-bool wait
+indicator if parent is waiting on child
+
+-bool exit
+indicator of if child has exited
+
+-int exit_status
+exit status of the child
+
+-int pid
+child processes pid
+
+-int load
+indicator of child process had loaded, load success or load failure
+
+-struct semaphore load_semaphore
+semaphore used in exec and load
+
+-struct semaphore exit_semaphore
+semaphore used in wait and exit
+
+-struct lock file_lock
+global lock for filesystem, used in file system syscalls
+
+struct do_file
+{
+	int fd;
+	struct file *file;
+	struct list_elem elem;
+};
+-int fd
+file descriptor which corresponds to open file
+
+-struct file *file
+the open file struct
+
+-struct list_elem elem
+list element in processes file list
+
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
@@ -106,6 +173,15 @@ opening the file gets that specific file descriptor.
 
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
+
+In our syscall handler we first check if the stack pointer is valid.
+If valid, we derefrence the stack pointer, this allows us to find
+which syscall is to be run.
+We retrieve each arguement and check its validity. For pointer arguements
+we check for validity and derefrence to a kernel virtual adress. For
+strings and buffers, each byte is checked for validity. For syscalls, we
+call with the arguements, then user data can be returned through
+the interrupt frame's register eax.
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
@@ -123,6 +199,14 @@ because each number of byes can be split into two pages at most.
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
 
+The process with a child pid goes through its list of child processes
+and searches for the process with the pid. If the child pid does not
+exist, or if the current process is already waiting on the child we 
+return -1. Else the child processes bool wait is set to true and the
+current process waits until that process exits. Then the current process
+gets the childs exit status and removes the child from its child list and
+we return the exit status.
+
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
 >> process to be terminated.  System calls are fraught with such
@@ -137,12 +221,34 @@ because each number of byes can be split into two pages at most.
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
+We have seperate functions for pointers. One function has us check the
+validity of the individual pointer, in this function we also tell our
+process to exit if the pointer is invalid. This function is usedin the 
+functions that check the validity of buffers and strings. Another function
+derefrences the pointers.
+When thread_exit is called, it calls process_exit if the thread is a user
+program. In process_exit the file and list of child processes are freed. 
+In thread_exit, the lock list is freed.
+If a user process calls write with a buffer size of X, where the pointer
+to the X - ith byte is invalid. The call number is first read from the 
+user stack along with the arguements. For each pointer in the range of
+the buffer size, the pointer is checked for validity. At the X - ith
+byte, the validity will fail and exit will be called and -1 returned.
+From here we see that the exit status is a failure and the call thread_exit
+. The resources are freed and the thread dies and the next thread is run.
+
 ---- SYNCHRONIZATION ----
 
 >> B7: The "exec" system call returns -1 if loading the new executable
 >> fails, so it cannot return before the new executable has completed
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
+
+When a process calls exec, it creates a child process struct for the child
+process in its child list. The childs load variable is set to not loaded 
+flag and the load semaphore is set down. Then when the child process is 
+loaded it sets the load variable to load fail flag or load success flag 
+and the load semaphore is set up.
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
@@ -151,10 +257,19 @@ because each number of byes can be split into two pages at most.
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+We initialize a wait semaphore to zero. This way it is irrelevent in 
+the order of P and C finishing.
+If P calls wait(C) before C exits 
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
+
+For pointers, there are several places where errors could occur. 
+With  pointers that the user tries to access in user space which are 
+invalid, a page fault interrupt occurs and exit is called an -1 is 
+returned.
 
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
