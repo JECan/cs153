@@ -271,7 +271,7 @@ to true and sets the semaphore up. This wakes the parent.
 The process info struct in the parents child list must be freed. These 
 structs are freed once a parent process completes a wait for its child.
 If P terminates Before C exits, C will detect that its P thread is not
-alive, therefore it does not try to access its child process struct in the 
+alive, therefore it does not try to access its process_info struct in the 
 parent. 
 If P terminates without waiting after C exits, the process info struct
 for C is simply freed with all other remaining child processes in 
