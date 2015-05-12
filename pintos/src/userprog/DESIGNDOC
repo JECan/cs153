@@ -32,8 +32,12 @@ http://www.scs.stanford.edu/10wi-cs140/labs/10wi-proj2.pdf
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
 struct exec_helper    
-//takes in a filename and contains a semaphore to handle race conditions,
-a bool for successful loading
+{
+	const char *file_name;
+	sema sema_load;
+	bool success load;
+};
+-shares data between process_execute and thread_create.
 
 static bool setup_stack_helper(void **esp)     //used to setup the stack pointer and pushing
 onto the stack correctly
