@@ -98,6 +98,10 @@ for the specific file during process initialization.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
 
+The file descriptors are unique just within a single process. The process
+opening the file gets that specific file descriptor.
+
+
 ---- ALGORITHMS ----
 
 >> B3: Describe your code for reading and writing user data from the
@@ -109,6 +113,12 @@ for the specific file during process initialization.
 >> (e.g. calls to pagedir_get_page()) that might result?  What about
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
+
+Each byte requires one call to pagedir_get_page() because the number of 
+following byes pointed to by the user lie on the same page is not known.
+For 2 bytes and for 4096 bytes the number of calls should be at most 2 
+because each number of byes can be split into two pages at most. 
+
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
@@ -149,8 +159,15 @@ for the specific file during process initialization.
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+Because file descriptors are unique for each process, there is no need to
+eliminate race conditions. A disadvantage is that our design does not 
+account for overflow.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+Each process only contains one thread. The advantage of this is that it 
+is simple although our approach fails for multithreaded processes.
 
 			   SURVEY QUESTIONS
 			   ================
