@@ -255,17 +255,13 @@ and the load semaphore is set up.
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
-We use strtok_r() in conjunction with the struct exec_helper(const char* file_name).
-We parse the arguments and remove spaces and with strtok_r. We use
-char* strtok_r(char* str, const char* delim, char** saveptr);
-this particular function has the saveptr which allows us to maintain context
-between successive calls on the same string. Since we are using pointers
-along with the delim, we can be sure that we are taking in args in the
-correct order. As well, we use in the exec_helper to determine if program
-load was successful and if program in loading. The args pushed onto the stack
-obviously should be(LIFO) since it is indeed a stack. We know the size of bytes
-being pushed onto the stack and we know the amount of space we still have
-available. With this, we know whether or not we will overflow.
+If P needs to wait on C, then when creating the process C, we need C to 
+have this thread increment a semaphore and only down the semaphore once 
+C’s process has completed. This will prevent P from finishing before C. 
+After C exits, semaphore should be 0 so P is free to use resources.  
+For the last case when P terminates without waiting, if either process 
+P or C terminates, then its resources should be freed. Otherwise, we will 
+have a process hogging resources it doesn’t need. 
 
 We initialize a wait semaphore to zero. This way it is irrelevent in 
 the order of P and C finishing.
