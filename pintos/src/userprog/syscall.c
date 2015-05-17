@@ -87,7 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			break;
 		case SYS_WRITE:
 			arg[2] = translate((const void *) arg[2]);
-			f->eax =write(arg[1], (const void *) arg[3], (unsigned) arg[3]);
+			f->eax =write(arg[1], (const void *) arg[2], (unsigned) arg[3]);
 			break;
 		case SYS_SEEK:
 			seek(arg[1], (unsigned) arg[2]);
@@ -217,6 +217,7 @@ void seek(int fd, unsigned position)
 	if(!f)
 	{
 		lock_release(&file_lock);
+		return;
 	}
 	file_seek(f, position);
 	lock_release(&file_lock);
@@ -260,42 +261,35 @@ int translate(const void *vaddr)
 }
 int my_add_file(struct file *f)
 {
-	/*
 	struct file_proc *fp = malloc(sizeof(struct file_proc));
 	fp->file = f;
 	fp->fd = thread_current()->fd;
 	thread_current()->fd++;
 	list_push_back(&thread_current()->filelist, &fp->elem);
 	return fp->fd;
-	*/
-//	return 1;
 }
 struct file* my_get_file(int fd)
 {
-	/*
 	struct thread *t = thread_current();
 	struct list_elem *i;
 	for(i = list_begin(&t->filelist); 
 		i != list_end(&t->filelist); 
 		i= list_next(i))
 	{
-		struct file_proc *pf = list_entry(i, struct proc_file, elem);
+		struct file_proc *pf = list_entry(i, struct file_proc, elem);
 		if(fd == pf->fd)
 			return pf->file;
 	}
 	return NULL;
-	*/
-//	return NULL;
 }
 void my_close_file(int fd)
 {
-	/*
 	struct thread *t = thread_current();
 	struct list_elem *next, *e = list_begin(&t->filelist);
 	while(e != list_end(&t->filelist))
 	{
 		next = list_next(e);
-		struct proc_file *pf = list_entry(e, struct proc_file, elem);
+		struct file_proc *pf = list_entry(e, struct file_proc, elem);
 		if(fd == pf->fd || fd == -1)
 		{
 			file_close(pf->file);
@@ -308,6 +302,4 @@ void my_close_file(int fd)
 		}
 	e = next;
 	}
-	*/
-//	return;
 }
