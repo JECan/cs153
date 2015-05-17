@@ -7,11 +7,11 @@
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/syscall.h"
@@ -212,13 +212,19 @@ thread_create (const char *name, int priority,
 
 	
   //adding child process to child list
-  struct process_info* proc = malloc(sizeof(struct process_info));
-  proc->pid = t->tid;
-  proc->load = 0;
-  proc->wait = false;
-  proc->exit = false;
-  lock_init(&proc->lock_wait);
-  list_push_back(&thread_current()->list_of_children,&proc->elem);
+/*
+  struct process_info* cp = malloc(sizeof(struct process_info));
+  cp->pid = t->tid;
+  cp->load = 0;
+  cp->wait = false;
+  cp->exit = false;
+  lock_init(&cp->lock_wait);
+  list_push_back(&thread_current()->list_of_children,&cp->elem);
+*/
+
+  t->parent = thread_tid();
+  struct process_info *cp = add_child(t->tid);
+  t->cp = cp;
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -521,7 +527,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->fd = 2;
 
   list_init(&t->list_of_children);
-  t->parent = thread_current()->tid;
+//t->parent = thread_current()->tid;
+  t->cp = NULL;
+  t->parent = -1;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -762,3 +770,17 @@ void update_priority(void)
 	}
 }
 /* END OF ADDED FUNCTIONS FOR PINTOS PROJECT PART 1 */
+//PROJECT 2 FUNCITONS
+bool thread_alive(int pid)
+{
+	struct list_elem *e;
+	for(e = list_begin(&all_list); 
+		e != list_end(&all_list);
+		e = list_next(e))
+	{
+		struct thread *t = list_entry(e, struct thread,allelem);
+		if(t->tid == pid)
+			return true;
+	}
+	return false;
+}

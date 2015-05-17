@@ -14,9 +14,6 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
-struct process_info* get_proc(int pid);
-void remove_proc(int pid);
-
 
 struct lock file_lock;
 //used for all file system syscalls
@@ -30,9 +27,11 @@ struct file_proc
 
 int add_file(struct file *f);
 struct file* get_file(int fd);
-void close_file(int fd);
+//void close_file(int fd);
 static void syscall_handler (struct intr_frame *);
 int translate(const void *vaddr);
+//struct process_info* get_child_process(int pid);
+//void remove_child_process(struct process_info *cp);
 
 
 void
@@ -49,8 +48,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 //  printf ("system call!\n");
 //  thread_exit ();
   int i;
-  int arg[3];
-  for(i = 0; i < 3; i++)
+  int arg[4];
+  for(i = 0; i < 4; i++)
   {
   	  arg[i] = * ((int *) f->esp + i);
   }
@@ -104,7 +103,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}
 }
 
-
+//---------------------------------
 void halt (void)
 {
 	shutdown_power_off();	
@@ -113,31 +112,42 @@ void halt (void)
 void exit(int status)
 {
 //	thread_exit();
-	struct thread *p = thread_exists(thread_current()->parent);
-	if(p)
+/*	struct thread *parent = thread_exists(thread_current()->parent);
+	if(parent)
 	{
-		struct process_info *c = get_proc(thread_current()->tid);
-		if(c->wait)
+		struct process_info *cp = get_child_process(thread_current()->tid);
+		if(cp->wait)
 		{
-			c->exit_status = status;
+			cp->status = status;
 		}
 	}
+	*/
+	struct thread *current = thread_current();
+	if(thread_alive(current->parent))
+	{
+		current->cp->status = status;
+	}
+	printf("%s: exit(%d)\n", current->name,status);
 	thread_exit();
 }
 //---------------------------------
 pid_t exec(const char *cmd_line)
 {
 	pid_t pid = process_execute(cmd_line);
-	struct process_info* c = get_proc(pid);
-	if(!c)
+	struct process_info* cp = get_child_process(pid);
+	ASSERT(cp);
+/*	if(!cp)
 	{
 		return -1;
 	}
-	while(c->load == 0)
+	ASSERT(cp);
+*/
+	while(cp->load == 0)
 	{
 		//block the trhead
+		barrier();
 	}
-	if(c->load == 2)
+	if(cp->load == 2)
 	{
 		return -1;
 	}		
@@ -329,3 +339,55 @@ void close_file(int fd)
 	e = next;
 	}
 }
+//---------------------------------
+struct process_info* get_child_process(int pid)
+{
+	struct thread *t = thread_current();
+	struct list_elem *e;
+	for(e = list_begin (&t->list_of_children);
+		e != list_end(&t->list_of_children);
+		e = list_next(e))
+	{
+		struct process_info *cp = list_entry (e, struct process_info, elem);
+		if(pid == cp->pid)
+		{
+			return cp;
+		}
+	}
+	return NULL;
+}
+//---------------------------------
+void remove_child_process(struct process_info *cp)
+{
+	list_remove(&cp->elem);
+	free(cp);
+}
+//---------------------------------
+struct process_info* add_child(int pid)
+{
+	struct process_info* cp = malloc(sizeof(struct process_info));
+	cp->pid = pid;
+	cp->load = 0;
+	cp->wait = false;
+	cp->exit = false;
+	lock_init(&cp->lock_wait);
+	list_push_back(&thread_current()->list_of_children, &cp->elem);
+	return cp;
+}
+//---------------------------------
+void remove_child_proc(void)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *next = list_begin(&curr->list_of_children);
+	struct list_elem *i = list_begin(&curr->list_of_children);
+	while(i != list_end(&curr->list_of_children))
+	{
+		next = list_next(i);
+		struct process_info *cp = list_entry(i, struct process_info, elem);
+		list_remove(&cp->elem);
+		free(cp);
+		i = next;
+	}
+}
+
+//---------------------------------

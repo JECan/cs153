@@ -19,9 +19,10 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "userprog/syscall.h"
+#include "threads/synch.h"
 
-struct process_info* get_proc(int pid);
-void remove_proc(int pid);
+//struct process_info* get_proc(int pid);
+//void remove_child_process(int pid);
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp,
@@ -43,6 +44,9 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  char * saveptr;
+  file_name = strtok_r((char*) file_name, " ", &saveptr);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -74,10 +78,12 @@ start_process (void *file_name_)
   if(success)
   {
 	//load success
+	thread_current()->cp->load = 1;
   }
   else
   {
 	//load_fail
+	thread_current()->cp->load = 2;
   }
 
   /* If load failed, quit. */
@@ -108,7 +114,7 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
 //  return -1;
-  struct process_info* cp = get_proc(child_tid);
+  struct process_info *cp = get_child_process(child_tid);
   if(!cp)
   {
 	return -1;
@@ -117,12 +123,14 @@ process_wait (tid_t child_tid UNUSED)
   {
 	return -1;
   }
+  cp->wait = true;
   while(!cp->exit)
   {
-	lock_acquire(&cp->lock_wait);
+	//lock_acquire(&cp->lock_wait);
+	barrier();
   }
-  int status = cp->exit_status;
-  remove_proc(child_tid);
+  int status = cp->status;
+  remove_child_process(cp);
   return status;
 }
 
@@ -134,10 +142,15 @@ process_exit (void)
   uint32_t *pd;
 
   //close all files opended by proc
-  close_file(-1);
-  //free the list of children
-  remove_proc(-1);
-
+  close_file(CLOSE_ALL);
+//free the list of children
+//  remove_child_process(CLOSE_ALL);
+	
+  remove_child_proc();
+  if(thread_alive(cur->parent))
+  {
+	cur->cp->exit = true;
+  }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -517,7 +530,8 @@ setup_stack (void **esp, const char *filename, char **saveptr)
 	if(i)
 	{
 		*esp -= i;
-		memcpy(*esp, &argv[argc], sizeof(void *));
+	//	memcpy(*esp, &argv[argc], sizeof(void *));
+		memcpy(*esp, &argv[argc], i);
 	}
 	//push argv[i] for all i
 	for(i = argc; i >= 0; i--)

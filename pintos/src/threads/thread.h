@@ -121,6 +121,7 @@ struct thread
     //wait and exec syscalls
     struct list list_of_children;
     tid_t parent;
+    struct process_info* cp;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -172,4 +173,6 @@ void lock_removal(struct lock *lock);
 void update_priority(void);
 
 /*END OF NEW FUNCTIONS FOR PINTOS PROJECT PART 1 */
+bool thread_alive(int pid);
+
 #endif /* threads/thread.h */
