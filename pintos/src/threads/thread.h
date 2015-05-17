@@ -113,6 +113,10 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    //FOR PROJECT 2
+    struct list filelist;
+    int fd;
   };
 
 /* If false (default), use round-robin scheduler.

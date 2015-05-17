@@ -17,9 +17,12 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (const char *cmdline, void (**eip) (void), void **esp,
+				  char** saveptr);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -54,12 +57,17 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  //for gettting file name aka first parsed token
+  char *saveptr;
+  file_name = strtok_r(file_name, " ", &saveptr);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+//success = load (file_name, &if_.eip, &if_.esp);
+  success = load(file_name, &if_.eip, &if_.esp, &saveptr);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -97,6 +105,8 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  my_close_file(-1);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -195,7 +205,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, const char *filename, char** saveptr);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -206,7 +216,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp, 
+	  char **saveptr) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -302,7 +313,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, file_name, saveptr))
     goto done;
 
   /* Start address. */
@@ -427,8 +438,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, const char *filename, char **saveptr) 
 {
+  //default arguement size is at least 2
+  size_t default_argv = 2;
+  //default work size is at least 8
+  size_t default_word_size = 4;
   uint8_t *kpage;
   bool success = false;
 
@@ -439,9 +454,60 @@ setup_stack (void **esp)
       if (success)
         *esp = PHYS_BASE;
       else
-        palloc_free_page (kpage);
+//      palloc_free_page (kpage);
+      {
+		palloc_free_page(kpage);
+		return success;
+      }
     }
-  return success;
+    char *mytoken;
+    char **argv = malloc(default_argv*sizeof(char*));
+    int i;
+    int argc = 0;
+    int sizeof_argv = default_argv;
+
+	//pushing arguements to the stack
+	for(mytoken = (char *) filename; mytoken != NULL;
+		mytoken = strtok_r(NULL, " ", saveptr))
+	{
+		*esp -= strlen(mytoken) + 1;
+		argv[argc] = *esp;
+		argc++;
+		//resize argv if limit reached
+		if(argv >= sizeof_argv)
+		{
+			sizeof_argv = sizeof_argv * 2;
+			argv = realloc(argv, default_argv * sizeof(char *));
+		}
+		memcpy(*esp, mytoken, strlen(mytoken) + 1);
+	}
+	argv[argc] = 0;
+	//we allighn word size to 4 bytes
+	i = (size_t) *esp % default_word_size;
+	if(i)
+	{
+		*esp -= i;
+		memcpy(*esp, &argv[argc], sizeof(void *));
+	}
+	//push argv[i] for all i
+	for(i = argc; i >= 0; i--)
+	{
+		*esp -= sizeof(char *);
+		memcpy(*esp, &argv[i], sizeof(char *));
+	}
+	//pushing agrv
+	mytoken = *esp;
+	*esp -= sizeof(char **);
+	memcpy(*esp, &mytoken, sizeof(char **));
+	//pushing argc
+	*esp -= sizeof(int);
+	memcpy(*esp, &argc, sizeof(int));
+	//pushing fake return address
+	*esp -= sizeof(void *);
+	memcpy(*esp, &argv[argc], sizeof(void *));
+	
+	free (argv);
+	return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel

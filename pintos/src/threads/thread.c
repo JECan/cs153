@@ -503,6 +503,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->initial_priority = priority;
   t->lock_wait = NULL;
   list_init(&t->donate);
+
+  //initialize
+  list_init(&t->filelist);
+  t->fd = 2;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
