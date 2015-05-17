@@ -14,6 +14,7 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
+#define VADDR_BOTTOM ((void *) 0x08048000)
 
 struct lock file_lock;
 //used for all file system syscalls
@@ -27,11 +28,14 @@ struct file_proc
 
 int add_file(struct file *f);
 struct file* get_file(int fd);
-//void close_file(int fd);
+void close_file(int fd);
 static void syscall_handler (struct intr_frame *);
 int translate(const void *vaddr);
+void get_arguement(struct intr_frame *f, int *arg, int n);
+void check_validity(const void *vaddr);
 //struct process_info* get_child_process(int pid);
 //void remove_child_process(struct process_info *cp);
+
 
 
 void
@@ -47,58 +51,87 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
 //  printf ("system call!\n");
 //  thread_exit ();
-  int i;
+/*int i;
   int arg[4];
   for(i = 0; i < 4; i++)
   {
   	  arg[i] = * ((int *) f->esp + i);
   }
 	switch(arg[0])
+*/
+	int arg[4];
+	check_validity((const void*) f->esp);
+	switch (* (int *) f->esp)
 	{
 		case SYS_HALT:
 			halt();
 			break;
 		case SYS_EXIT:
-			exit(arg[1]);
+			//exit(arg[1]);
+			get_arguement(f, &arg[0],1);
+			exit(arg[0]);
 			break;
 		case SYS_EXEC:
-			arg[1] = translate((const void *) arg[1]);
-			f->eax =  exec((const char *) arg[1]);
+			//arg[1] = translate((const void *) arg[1]);
+			//f->eax =  exec((const char *) arg[1]);
+			get_arguement(f, &arg[0], 1);
+			arg[0] = translate((const void *) arg[0]);
+			f->eax = exec((const char *) arg[0]);
 			break;
 		case SYS_WAIT:
-			f->eax =wait(arg[1]);
+			get_arguement(f, &arg[0],1);
+			f->eax =wait(arg[0]);
 			break;
 		case SYS_CREATE:
-			arg[1] = translate((const void *) arg[1]);
-			f->eax =create((const char *)arg[1], (unsigned) arg[2]);
+			//arg[1] = translate((const void *) arg[1]);
+			//f->eax =create((const char *)arg[1], (unsigned) arg[2]);
+			get_arguement(f, &arg[0],2);
+			arg[0] = translate((const void *) arg[0]);
+			f->eax = create((const char *) arg[0], (unsigned) arg[1]);
 			break;
 		case SYS_REMOVE:
-			arg[1] = translate((const void *) arg[1]);
-			f->eax =remove((const char *) arg[1]);
+			//arg[1] = translate((const void *) arg[1]);
+			//f->eax =remove((const char *) arg[1]);
+			get_arguement(f, &arg[0],1);
+			arg[0] = translate((const void *) arg[0]);
+			f->eax =remove((const char *) arg[0]);
 			break;
 		case SYS_OPEN:
-			arg[1] = translate((const void *) arg[1]);
-			f->eax =open((const char *) arg[1]);
+			//arg[1] = translate((const void *) arg[1]);
+			//f->eax =open((const char *) arg[1]);
+			get_arguement(f, &arg[0],1);
+			f->eax =open((const char *) arg[0]);
 			break;
 		case SYS_FILESIZE:
-			f->eax =filesize(arg[1]);
+			get_arguement(f, &arg[0],1);
+			f->eax =filesize(arg[0]);
 			break;
 		case SYS_READ:
-			arg[2] = translate((const void *) arg[2]);
-			f->eax =read(arg[1], (void *) arg[2], (unsigned) arg[3]);
+			//arg[2] = translate((const void *) arg[2]);
+			//f->eax =read(arg[1], (void *) arg[2], (unsigned) arg[3]);
+			get_arguement(f, &arg[0],3);
+			f->eax =read(arg[0], (void *) arg[1], (unsigned) arg[2]);
 			break;
 		case SYS_WRITE:
-			arg[2] = translate((const void *) arg[2]);
-			f->eax =write(arg[1], (const void *) arg[2], (unsigned) arg[3]);
+			//arg[2] = translate((const void *) arg[2]);
+			//f->eax =write(arg[1], (const void *) arg[2], (unsigned) arg[3]);
+			get_arguement(f, &arg[0],3);
+			arg[1] = translate((const void *) arg[1]);
+			f->eax = write(arg[0], (const void *) arg[1], (unsigned) arg[2]);
 			break;
 		case SYS_SEEK:
-			seek(arg[1], (unsigned) arg[2]);
+			//seek(arg[1], (unsigned) arg[2]);
+			get_arguement(f, &arg[0],1);
+			seek(arg[0], (unsigned) arg[1]);
 			break;
 		case SYS_TELL:
-			f->eax =tell(arg[1]);
+			//f->eax =tell(arg[1]);
+			get_arguement(f, &arg[0], 1);
+			f->eax = tell(arg[0]);
 			break;
 		case SYS_CLOSE:
-			close(arg[1]);
+			get_arguement(f,&arg[0],1);
+			close(arg[0]);
 			break;
 	}
 }
@@ -280,18 +313,24 @@ void close(int fd)
 	lock_release(&file_lock);
 }
 //---------------------------------
+void check_validity(const void *vaddr)
+{
+	if(!is_user_vaddr(vaddr) || vaddr < VADDR_BOTTOM)
+	{
+		exit(-1);
+	}
+}
+//---------------------------------
+
 int translate(const void *vaddr)
 {
-	if(!is_user_vaddr(vaddr))
-	{
-		thread_exit();
-		return 0;
-	}
+	check_validity(vaddr);	
 	void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
 	if(!ptr)
 	{
-		thread_exit();
-		return 0;
+	//	thread_exit();
+	//	return 0;
+		exit(-1);
 	}
 	return (int) ptr;
 }
@@ -389,5 +428,17 @@ void remove_child_proc(void)
 		i = next;
 	}
 }
-
 //---------------------------------
+void get_arguement(struct intr_frame *f, int *arg, int n)
+{
+	int i;
+	int *ptr;
+	for(i=0; i < n; i++)
+	{
+		ptr = (int *) f->esp + i + 1;
+		check_validity((const void *) ptr);
+		arg[i] = *ptr;
+	}
+}
+//---------------------------------
+
