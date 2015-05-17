@@ -20,6 +20,9 @@
 #include "threads/malloc.h"
 #include "userprog/syscall.h"
 
+struct process_info* get_proc(int pid);
+void remove_proc(int pid);
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp,
 				  char** saveptr);
@@ -68,6 +71,14 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 //success = load (file_name, &if_.eip, &if_.esp);
   success = load(file_name, &if_.eip, &if_.esp, &saveptr);
+  if(success)
+  {
+	//load success
+  }
+  else
+  {
+	//load_fail
+  }
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -96,7 +107,23 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+//  return -1;
+  struct process_info* cp = get_proc(child_tid);
+  if(!cp)
+  {
+	return -1;
+  }
+  if(cp->wait)
+  {
+	return -1;
+  }
+  while(!cp->exit)
+  {
+	lock_acquire(&cp->lock_wait);
+  }
+  int status = cp->exit_status;
+  remove_proc(child_tid);
+  return status;
 }
 
 /* Free the current process's resources. */
@@ -106,7 +133,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  my_close_file(-1);
+  //close all files opended by proc
+  close_file(-1);
+  //free the list of children
+  remove_proc(-1);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

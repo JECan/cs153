@@ -8,12 +8,15 @@
 #include "devices/shutdown.h"
 #include "userprog/process.h"
 #include "threads/vaddr.h"
-#include "filesys/file.c"
+#include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "userprog/pagedir.h"
 #include "threads/malloc.h"
 #include "threads/synch.h"
-#include "userprog/syscall.h"
+
+struct process_info* get_proc(int pid);
+void remove_proc(int pid);
+
 
 struct lock file_lock;
 //used for all file system syscalls
@@ -25,9 +28,9 @@ struct file_proc
 };
 
 
-int my_add_file(struct file *f);
-struct file* my_get_file(int fd);
-void my_close_file(int fd);
+int add_file(struct file *f);
+struct file* get_file(int fd);
+void close_file(int fd);
 static void syscall_handler (struct intr_frame *);
 int translate(const void *vaddr);
 
@@ -109,12 +112,35 @@ void halt (void)
 //---------------------------------
 void exit(int status)
 {
+//	thread_exit();
+	struct thread *p = thread_exists(thread_current()->parent);
+	if(p)
+	{
+		struct process_info *c = get_proc(thread_current()->tid);
+		if(c->wait)
+		{
+			c->exit_status = status;
+		}
+	}
 	thread_exit();
 }
 //---------------------------------
 pid_t exec(const char *cmd_line)
 {
 	pid_t pid = process_execute(cmd_line);
+	struct process_info* c = get_proc(pid);
+	if(!c)
+	{
+		return -1;
+	}
+	while(c->load == 0)
+	{
+		//block the trhead
+	}
+	if(c->load == 2)
+	{
+		return -1;
+	}		
 	return pid;
 }
 //---------------------------------
@@ -148,7 +174,7 @@ int open(const char *file)
 		lock_release(&file_lock);
 		return -1;
 	}
-	int fd = my_add_file(f);
+	int fd = add_file(f);
 	lock_release(&file_lock);
 	return fd;
 }
@@ -156,7 +182,7 @@ int open(const char *file)
 int filesize(int fd)
 {
 	lock_acquire(&file_lock);
-	struct file *f = my_get_file(fd);
+	struct file *f = get_file(fd);
 	if(!f)
 	{
 		lock_release(&file_lock);
@@ -180,7 +206,7 @@ int read(int fd, void *buffer, unsigned size)
 		return size;
 	}
 	lock_acquire(&file_lock);
-	struct file *f = my_get_file(fd);
+	struct file *f = get_file(fd);
 	if(!f)
 	{
 		lock_release(&file_lock);
@@ -199,7 +225,7 @@ int write(int fd, const void *buffer, unsigned size)
 		return size;
 	}
 	lock_acquire(&file_lock);
-	struct file *f = my_get_file(fd);
+	struct file *f = get_file(fd);
 	if(!f)
 	{
 		lock_release(&file_lock);
@@ -213,7 +239,7 @@ int write(int fd, const void *buffer, unsigned size)
 void seek(int fd, unsigned position)
 {
 	lock_acquire(&file_lock);
-	struct file *f = my_get_file(fd);
+	struct file *f = get_file(fd);
 	if(!f)
 	{
 		lock_release(&file_lock);
@@ -226,7 +252,7 @@ void seek(int fd, unsigned position)
 unsigned tell(int fd)
 {
 	lock_acquire(&file_lock);
-	struct file *f = my_get_file(fd);
+	struct file *f = get_file(fd);
 	if(!f)
 	{
 		lock_release(&file_lock);
@@ -240,7 +266,7 @@ unsigned tell(int fd)
 void close(int fd)
 {
 	lock_acquire(&file_lock);
-	my_close_file(fd);
+	close_file(fd);
 	lock_release(&file_lock);
 }
 //---------------------------------
@@ -259,7 +285,7 @@ int translate(const void *vaddr)
 	}
 	return (int) ptr;
 }
-int my_add_file(struct file *f)
+int add_file(struct file *f)
 {
 	struct file_proc *fp = malloc(sizeof(struct file_proc));
 	fp->file = f;
@@ -268,7 +294,7 @@ int my_add_file(struct file *f)
 	list_push_back(&thread_current()->filelist, &fp->elem);
 	return fp->fd;
 }
-struct file* my_get_file(int fd)
+struct file* get_file(int fd)
 {
 	struct thread *t = thread_current();
 	struct list_elem *i;
@@ -282,7 +308,7 @@ struct file* my_get_file(int fd)
 	}
 	return NULL;
 }
-void my_close_file(int fd)
+void close_file(int fd)
 {
 	struct thread *t = thread_current();
 	struct list_elem *next, *e = list_begin(&t->filelist);

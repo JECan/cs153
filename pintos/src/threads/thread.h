@@ -117,6 +117,10 @@ struct thread
     //FOR PROJECT 2
     struct list filelist;
     int fd;
+
+    //wait and exec syscalls
+    struct list list_of_children;
+    tid_t parent;
   };
 
 /* If false (default), use round-robin scheduler.
