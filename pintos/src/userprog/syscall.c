@@ -59,7 +59,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 	switch(arg[0])
 */
-	int arg[4];
+	int arg[3];
 	check_validity((const void*) f->esp);
 	switch (* (int *) f->esp)
 	{
@@ -100,6 +100,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			//arg[1] = translate((const void *) arg[1]);
 			//f->eax =open((const char *) arg[1]);
 			get_arguement(f, &arg[0],1);
+			arg[0] = translate((const void *) arg[0]);
 			f->eax =open((const char *) arg[0]);
 			break;
 		case SYS_FILESIZE:
@@ -110,6 +111,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			//arg[2] = translate((const void *) arg[2]);
 			//f->eax =read(arg[1], (void *) arg[2], (unsigned) arg[3]);
 			get_arguement(f, &arg[0],3);
+			arg[1] = translate((const void *) arg[1]);
 			f->eax =read(arg[0], (void *) arg[1], (unsigned) arg[2]);
 			break;
 		case SYS_WRITE:
@@ -121,7 +123,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			break;
 		case SYS_SEEK:
 			//seek(arg[1], (unsigned) arg[2]);
-			get_arguement(f, &arg[0],1);
+			get_arguement(f, &arg[0],2);
 			seek(arg[0], (unsigned) arg[1]);
 			break;
 		case SYS_TELL:

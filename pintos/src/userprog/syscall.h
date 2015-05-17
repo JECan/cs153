@@ -25,7 +25,7 @@ void remove_child_proc(void);
 
 void process_close_file (int fd);
 //void get_arguement(struct intr_frame *f, int *arg, int n);
-void check_validity(const void *vaddr);
+//void check_validity(const void *vaddr);
 
 void syscall_init (void);
 
