@@ -26,6 +26,23 @@ struct file_proc
 };
 
 
+
+//SYSCALL FUNCTIONS
+void halt(void);
+void exit(int status);
+pid_t exec(const char *cmd_line);
+int wait(pid_t pid);
+bool create(const char *file, unsigned initial_size);
+bool remove(const char *file);
+int open(const char *file);
+int filesize(int fd);
+int read(int fd, void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
+//END OF SYSCALL FUNCTIONS
+
 int add_file(struct file *f);
 struct file* get_file(int fd);
 void close_file(int fd);
@@ -33,10 +50,8 @@ static void syscall_handler (struct intr_frame *);
 int translate(const void *vaddr);
 void get_arguement(struct intr_frame *f, int *arg, int n);
 void check_validity(const void *vaddr);
-//struct process_info* get_child_process(int pid);
-//void remove_child_process(struct process_info *cp);
-
-
+struct process_info* get_child_process(int pid);
+void remove_child_process(struct process_info *cp);
 
 void
 syscall_init (void) 
@@ -44,7 +59,6 @@ syscall_init (void)
   lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
-
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
@@ -332,8 +346,6 @@ int translate(const void *vaddr)
 	void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
 	if(!ptr)
 	{
-	//	thread_exit();
-	//	return 0;
 		exit(-1);
 	}
 	return (int) ptr;
@@ -447,4 +459,3 @@ void get_arguement(struct intr_frame *f, int *arg, int n)
 	}
 }
 //---------------------------------
-
