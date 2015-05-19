@@ -177,10 +177,12 @@ pid_t exec(const char *cmd_line)
 	}
 	ASSERT(cp);
 */
-	while(cp->load == 0)
+	//while(cp->load == 0)
+	if(cp->load == 0)
 	{
 		//block the trhead
-		barrier();
+		//barrier();
+		sema_down(&cp->load_semaphore);
 	}
 	if(cp->load == 2)
 	{
@@ -411,7 +413,9 @@ struct process_info* add_child(int pid)
 	cp->load = 0;
 	cp->wait = false;
 	cp->exit = false;
-	lock_init(&cp->lock_wait);
+	//lock_init(&cp->lock_wait);
+	sema_init(&cp->load_semaphore,0);
+	sema_init(&cp->exit_semaphore,0);
 	list_push_back(&thread_current()->list_of_children, &cp->elem);
 	return cp;
 }

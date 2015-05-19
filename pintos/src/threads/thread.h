@@ -122,6 +122,7 @@ struct thread
     struct list list_of_children;
     tid_t parent;
     struct process_info* cp;
+    //end of additions from project 2
   };
 
 /* If false (default), use round-robin scheduler.

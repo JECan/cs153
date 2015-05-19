@@ -14,7 +14,8 @@ struct process_info {
 	int status;
 	int pid;
 	int load;
-	struct lock lock_wait;
+	struct semaphore load_semaphore;
+	struct semaphore exit_semaphore;
 	struct list_elem elem;
 };
 

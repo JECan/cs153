@@ -45,6 +45,8 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+
+  //parsed file name
   char * saveptr;
   file_name = strtok_r((char*) file_name, " ", &saveptr);
 
@@ -86,6 +88,7 @@ start_process (void *file_name_)
 	thread_current()->cp->load = 2;
   }
 
+  sema_up(&thread_current()->cp->load_semaphore);
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
