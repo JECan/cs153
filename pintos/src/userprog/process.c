@@ -145,7 +145,7 @@ process_exit (void)
   uint32_t *pd;
 
   //close all files opended by proc
-  close_file(CLOSE_ALL);
+  close_file(-1);
 //free the list of children
 //  remove_child_process(CLOSE_ALL);
 	
@@ -489,7 +489,7 @@ setup_stack (void **esp, const char *filename, char **saveptr)
   //default arguement size is at least 2
   size_t default_argv = 2;
   //default work size is at least 8
-  size_t default_word_size = 4;
+  size_t default_word_size = 8;
   uint8_t *kpage;
   bool success = false;
 
@@ -498,7 +498,7 @@ setup_stack (void **esp, const char *filename, char **saveptr)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
 //      palloc_free_page (kpage);
       {
@@ -507,8 +507,8 @@ setup_stack (void **esp, const char *filename, char **saveptr)
       }
     }
     char *mytoken;
-    char **argv = malloc(default_argv*sizeof(char*));
-    int i;
+    char **argv = malloc(2*sizeof(char*));
+    int iterator;
     int argc = 0;
     int sizeof_argv = default_argv;
 
@@ -529,18 +529,17 @@ setup_stack (void **esp, const char *filename, char **saveptr)
 	}
 	argv[argc] = 0;
 	//we allighn word size to 4 bytes
-	i = (size_t) *esp % default_word_size;
-	if(i)
+	iterator = (size_t) *esp % default_word_size;
+	if(iterator)
 	{
-		*esp -= i;
-	//	memcpy(*esp, &argv[argc], sizeof(void *));
-		memcpy(*esp, &argv[argc], i);
+		*esp -= iterator;
+		memcpy(*esp, &argv[argc], iterator);
 	}
 	//push argv[i] for all i
-	for(i = argc; i >= 0; i--)
+	for(iterator = argc; iterator >= 0; iterator--)
 	{
 		*esp -= sizeof(char *);
-		memcpy(*esp, &argv[i], sizeof(char *));
+		memcpy(*esp, &argv[iterator], sizeof(char *));
 	}
 	//pushing agrv
 	mytoken = *esp;

@@ -2,12 +2,6 @@
 #define USERPROG_SYSCALL_H
 #include "threads/synch.h"
 
-#define CLOSE_ALL -1
-#define ERROR -1
-#define NOT_LOADED 0
-#define LOAD_SUCCESS 1
-#define LOAD_FAIL 2
-
 struct process_info {
 	bool wait; 
 	bool exit;

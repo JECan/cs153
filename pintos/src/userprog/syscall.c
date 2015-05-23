@@ -47,7 +47,7 @@ int add_file(struct file *f);
 struct file* get_file(int fd);
 void close_file(int fd);
 static void syscall_handler (struct intr_frame *);
-int translate(const void *vaddr);
+int user_kernel(const void *vaddr);
 void get_arguement(struct intr_frame *f, int *arg, int n);
 void check_validity(const void *vaddr);
 struct process_info* get_child_process(int pid);
@@ -63,16 +63,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-//  printf ("system call!\n");
-//  thread_exit ();
-/*int i;
-  int arg[4];
-  for(i = 0; i < 4; i++)
-  {
-  	  arg[i] = * ((int *) f->esp + i);
-  }
-	switch(arg[0])
-*/
 	int arg[3];
 	check_validity((const void*) f->esp);
 	switch (* (int *) f->esp)
@@ -81,15 +71,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 			halt();
 			break;
 		case SYS_EXIT:
-			//exit(arg[1]);
 			get_arguement(f, &arg[0],1);
 			exit(arg[0]);
 			break;
 		case SYS_EXEC:
-			//arg[1] = translate((const void *) arg[1]);
-			//f->eax =  exec((const char *) arg[1]);
 			get_arguement(f, &arg[0], 1);
-			arg[0] = translate((const void *) arg[0]);
+			arg[0] = user_kernel((const void *) arg[0]);
 			f->eax = exec((const char *) arg[0]);
 			break;
 		case SYS_WAIT:
@@ -97,24 +84,18 @@ syscall_handler (struct intr_frame *f UNUSED)
 			f->eax =wait(arg[0]);
 			break;
 		case SYS_CREATE:
-			//arg[1] = translate((const void *) arg[1]);
-			//f->eax =create((const char *)arg[1], (unsigned) arg[2]);
 			get_arguement(f, &arg[0],2);
-			arg[0] = translate((const void *) arg[0]);
+			arg[0] = user_kernel((const void *) arg[0]);
 			f->eax = create((const char *) arg[0], (unsigned) arg[1]);
 			break;
 		case SYS_REMOVE:
-			//arg[1] = translate((const void *) arg[1]);
-			//f->eax =remove((const char *) arg[1]);
 			get_arguement(f, &arg[0],1);
-			arg[0] = translate((const void *) arg[0]);
+			arg[0] = user_kernel((const void *) arg[0]);
 			f->eax =remove((const char *) arg[0]);
 			break;
 		case SYS_OPEN:
-			//arg[1] = translate((const void *) arg[1]);
-			//f->eax =open((const char *) arg[1]);
 			get_arguement(f, &arg[0],1);
-			arg[0] = translate((const void *) arg[0]);
+			arg[0] = user_kernel((const void *) arg[0]);
 			f->eax =open((const char *) arg[0]);
 			break;
 		case SYS_FILESIZE:
@@ -122,26 +103,20 @@ syscall_handler (struct intr_frame *f UNUSED)
 			f->eax =filesize(arg[0]);
 			break;
 		case SYS_READ:
-			//arg[2] = translate((const void *) arg[2]);
-			//f->eax =read(arg[1], (void *) arg[2], (unsigned) arg[3]);
 			get_arguement(f, &arg[0],3);
-			arg[1] = translate((const void *) arg[1]);
+			arg[1] = user_kernel((const void *) arg[1]);
 			f->eax =read(arg[0], (void *) arg[1], (unsigned) arg[2]);
 			break;
 		case SYS_WRITE:
-			//arg[2] = translate((const void *) arg[2]);
-			//f->eax =write(arg[1], (const void *) arg[2], (unsigned) arg[3]);
 			get_arguement(f, &arg[0],3);
-			arg[1] = translate((const void *) arg[1]);
+			arg[1] = user_kernel((const void *) arg[1]);
 			f->eax = write(arg[0], (const void *) arg[1], (unsigned) arg[2]);
 			break;
 		case SYS_SEEK:
-			//seek(arg[1], (unsigned) arg[2]);
 			get_arguement(f, &arg[0],2);
 			seek(arg[0], (unsigned) arg[1]);
 			break;
 		case SYS_TELL:
-			//f->eax =tell(arg[1]);
 			get_arguement(f, &arg[0], 1);
 			f->eax = tell(arg[0]);
 			break;
@@ -160,45 +135,25 @@ void halt (void)
 //---------------------------------
 void exit(int status)
 {
-//	thread_exit();
-/*	struct thread *parent = thread_exists(thread_current()->parent);
-	if(parent)
-	{
-		struct process_info *cp = get_child_process(thread_current()->tid);
-		if(cp->wait)
-		{
-			cp->status = status;
-		}
-	}
-	*/
 	struct thread *current = thread_current();
 	if(thread_alive(current->parent))
 	{
 		current->cp->status = status;
 	}
-	printf("%s: exit(%d)\n", current->name,status);
+	printf("%s: exit(%d)\n", current->name, status);
 	thread_exit();
 }
 //---------------------------------
 pid_t exec(const char *cmd_line)
 {
 	pid_t pid = process_execute(cmd_line);
-	struct process_info* cp = get_child_process(pid);
-	ASSERT(cp);
-/*	if(!cp)
+	struct process_info* child_process = get_child_process(pid);
+	ASSERT(child_process);
+	if(child_process->load == 0)
 	{
-		return -1;
+		sema_down(&child_process->load_semaphore);
 	}
-	ASSERT(cp);
-*/
-	//while(cp->load == 0)
-	if(cp->load == 0)
-	{
-		//block the trhead
-		//barrier();
-		sema_down(&cp->load_semaphore);
-	}
-	if(cp->load == 2)
+	if(child_process->load == 2)
 	{
 		return -1;
 	}		
@@ -213,29 +168,29 @@ int wait(pid_t pid)
 bool create(const char *file, unsigned initial_size)
 {
 	lock_acquire(&file_lock);
-	bool success = filesys_create(file, initial_size);
+	bool noerror = filesys_create(file, initial_size);
 	lock_release(&file_lock);
-	return success;
+	return noerror;
 }
 //---------------------------------
 bool remove(const char *file)
 {
 	lock_acquire(&file_lock);
-	bool success = filesys_remove(file);
+	bool noerror = filesys_remove(file);
 	lock_release(&file_lock);
-	return success;
+	return noerror;
 }
 //---------------------------------
 int open(const char *file)
 {
 	lock_acquire(&file_lock);
-	struct file *f = filesys_open(file);
-	if(!f)
+	struct file *openfile = filesys_open(file);
+	if(!openfile)
 	{
 		lock_release(&file_lock);
 		return -1;
 	}
-	int fd = add_file(f);
+	int fd = add_file(openfile);
 	lock_release(&file_lock);
 	return fd;
 }
@@ -243,13 +198,13 @@ int open(const char *file)
 int filesize(int fd)
 {
 	lock_acquire(&file_lock);
-	struct file *f = get_file(fd);
-	if(!f)
+	struct file *getsize = get_file(fd);
+	if(!getsize)
 	{
 		lock_release(&file_lock);
 		return -1;
 	}
-	int size = file_length(f);
+	int size = file_length(getsize);
 	lock_release(&file_lock);
 	return size;
 }
@@ -267,13 +222,13 @@ int read(int fd, void *buffer, unsigned size)
 		return size;
 	}
 	lock_acquire(&file_lock);
-	struct file *f = get_file(fd);
-	if(!f)
+	struct file *readfile = get_file(fd);
+	if(!readfile)
 	{
 		lock_release(&file_lock);
 		return -1;
 	}
-	int byte = file_read(f, buffer, size);
+	int byte = file_read(readfile, buffer, size);
 	lock_release(&file_lock);
 	return byte;
 }
@@ -286,13 +241,13 @@ int write(int fd, const void *buffer, unsigned size)
 		return size;
 	}
 	lock_acquire(&file_lock);
-	struct file *f = get_file(fd);
-	if(!f)
+	struct file *writefile = get_file(fd);
+	if(!writefile)
 	{
 		lock_release(&file_lock);
 		return -1;
 	}
-	int bytes = file_write(f,buffer,size);
+	int bytes = file_write(writefile,buffer,size);
 	lock_release(&file_lock);
 	return bytes;
 }
@@ -300,26 +255,26 @@ int write(int fd, const void *buffer, unsigned size)
 void seek(int fd, unsigned position)
 {
 	lock_acquire(&file_lock);
-	struct file *f = get_file(fd);
-	if(!f)
+	struct file *seekfile = get_file(fd);
+	if(!seekfile)
 	{
 		lock_release(&file_lock);
 		return;
 	}
-	file_seek(f, position);
+	file_seek(seekfile, position);
 	lock_release(&file_lock);
 }
 //---------------------------------
 unsigned tell(int fd)
 {
 	lock_acquire(&file_lock);
-	struct file *f = get_file(fd);
-	if(!f)
+	struct file *tellfile = get_file(fd);
+	if(!tellfile)
 	{
 		lock_release(&file_lock);
 		return -1;
 	}
-	off_t offset = file_tell(f);
+	off_t offset = file_tell(tellfile);
 	lock_release(&file_lock);
 	return offset;
 }
@@ -339,45 +294,45 @@ void check_validity(const void *vaddr)
 	}
 }
 //---------------------------------
-
-int translate(const void *vaddr)
+//ADDIDTIONAL FUCNTIONS
+int user_kernel(const void *vaddr)
 {
 	check_validity(vaddr);	
-	void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
-	if(!ptr)
+	void *ukptr = pagedir_get_page(thread_current()->pagedir, vaddr);
+	if(!ukptr)
 	{
 		exit(-1);
 	}
-	return (int) ptr;
+	return (int) ukptr;
 }
 int add_file(struct file *f)
 {
-	struct file_proc *fp = malloc(sizeof(struct file_proc));
-	fp->file = f;
-	fp->fd = thread_current()->fd;
+	struct file_proc *addthis = malloc(sizeof(struct file_proc));
+	addthis->file = f;
+	addthis->fd = thread_current()->fd;
 	thread_current()->fd++;
-	list_push_back(&thread_current()->filelist, &fp->elem);
-	return fp->fd;
+	list_push_back(&thread_current()->filelist, &addthis->elem);
+	return addthis->fd;
 }
 struct file* get_file(int fd)
 {
-	struct thread *t = thread_current();
+	struct thread *getthis_thread = thread_current();
 	struct list_elem *i;
-	for(i = list_begin(&t->filelist); 
-		i != list_end(&t->filelist); 
+	for(i = list_begin(&getthis_thread->filelist); 
+		i != list_end(&getthis_thread->filelist); 
 		i= list_next(i))
 	{
-		struct file_proc *pf = list_entry(i, struct file_proc, elem);
-		if(fd == pf->fd)
-			return pf->file;
+		struct file_proc *fp = list_entry(i, struct file_proc, elem);
+		if(fd == fp->fd)
+			return fp->file;
 	}
 	return NULL;
 }
 void close_file(int fd)
 {
-	struct thread *t = thread_current();
-	struct list_elem *next, *e = list_begin(&t->filelist);
-	while(e != list_end(&t->filelist))
+	struct thread *current = thread_current();
+	struct list_elem *next, *e = list_begin(&current->filelist);
+	while(e != list_end(&current->filelist))
 	{
 		next = list_next(e);
 		struct file_proc *pf = list_entry(e, struct file_proc, elem);
@@ -397,10 +352,10 @@ void close_file(int fd)
 //---------------------------------
 struct process_info* get_child_process(int pid)
 {
-	struct thread *t = thread_current();
+	struct thread *current = thread_current();
 	struct list_elem *e;
-	for(e = list_begin (&t->list_of_children);
-		e != list_end(&t->list_of_children);
+	for(e = list_begin (&current->list_of_children);
+		e != list_end(&current->list_of_children);
 		e = list_next(e))
 	{
 		struct process_info *cp = list_entry (e, struct process_info, elem);
@@ -420,16 +375,15 @@ void remove_child_process(struct process_info *cp)
 //---------------------------------
 struct process_info* add_child(int pid)
 {
-	struct process_info* cp = malloc(sizeof(struct process_info));
-	cp->pid = pid;
-	cp->load = 0;
-	cp->wait = false;
-	cp->exit = false;
-	//lock_init(&cp->lock_wait);
-	sema_init(&cp->load_semaphore,0);
-	sema_init(&cp->exit_semaphore,0);
-	list_push_back(&thread_current()->list_of_children, &cp->elem);
-	return cp;
+	struct process_info* child = malloc(sizeof(struct process_info));
+	child->pid = pid;
+	child->load = 0;
+	child->wait = false;
+	child->exit = false;
+	sema_init(&child->load_semaphore,0);
+	sema_init(&child->exit_semaphore,0);
+	list_push_back(&thread_current()->list_of_children, &child->elem);
+	return child;
 }
 //---------------------------------
 void remove_child_proc(void)
