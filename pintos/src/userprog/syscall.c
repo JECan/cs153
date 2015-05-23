@@ -14,7 +14,6 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
-//#define VADDR_BOTTOM ((void *) 0x08048000)
 
 struct lock file_lock;
 //used for all file system syscalls
