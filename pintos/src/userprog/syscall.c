@@ -14,7 +14,7 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
-#define VADDR_BOTTOM ((void *) 0x08048000)
+//#define VADDR_BOTTOM ((void *) 0x08048000)
 
 struct lock file_lock;
 //used for all file system syscalls
@@ -52,6 +52,7 @@ void get_arguement(struct intr_frame *f, int *arg, int n);
 void check_validity(const void *vaddr);
 struct process_info* get_child_process(int pid);
 void remove_child_process(struct process_info *cp);
+
 
 void
 syscall_init (void) 
@@ -288,7 +289,7 @@ void close(int fd)
 //---------------------------------
 void check_validity(const void *vaddr)
 {
-	if(!is_user_vaddr(vaddr) || vaddr < VADDR_BOTTOM)
+	if(!is_user_vaddr(vaddr) || vaddr < 0x08048000)
 	{
 		exit(-1);
 	}
